@@ -1,0 +1,635 @@
+/* Global Styles - LeetCode inspired */
+body {
+  background-color: hsl(0 0% 94.1%) !important;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial,
+    sans-serif, Apple Color Emoji, Segoe UI Emoji !important;
+  line-height: 1.5 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 14px !important;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.header-expander,
+small.hide-on-print,
+.problems-pager {
+  display: none;
+}
+
+.problem-properties {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.problem-dataset > p {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.footer {
+  margin: 0 !important;
+}
+
+/* Split Pane Layout */
+#rosalind-split-container {
+  display: flex;
+  width: 100vw;
+  height: calc(100vh - 40px);
+  position: fixed;
+  top: 40px;
+  left: 0;
+  overflow: hidden;
+}
+
+#rosalind-problem-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0.5rem;
+  border-radius: 8px;
+  background-color: white;
+}
+
+#rosalind-problem-header {
+  background-color: #00000005;
+  border-radius: 8px 8px 0 0;
+  padding: 4px;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.problem-header-div {
+  display: flex;
+}
+
+.problem-header-div > *:not(:first-child)::before {
+  background: #00000014;
+  content: "";
+  display: block;
+  height: 12px;
+  left: -1px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+}
+
+.problem-header-div > * {
+  padding: 4px 8px;
+  margin-right: 4px;
+}
+
+.problem-properties p {
+  margin-bottom: 9px !important;
+}
+
+#rosalind-problem-header > * {
+  color: #1a1a1a;
+}
+
+#rosalind-problem-footer {
+  background-color: #00000005;
+  border-radius: 0 0 8px 8px;
+  padding: 0.25rem;
+  border-top: 1px solid #e8e8e8;
+}
+
+#rosalind-main-content {
+  flex: 1;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  max-width: 100%;
+  color: #262626;
+}
+
+#rosalind-main-content .container {
+  margin-top: 0;
+  border-radius: 0;
+}
+
+#rosalind-main-content * {
+  max-width: 100%;
+}
+
+#rosalind-repl-panel {
+  width: 50vw;
+  min-width: 300px;
+  max-width: 80vw;
+  background-color: white;
+  border-left: 1px solid #e8e8e8;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 8px;
+  position: relative;
+  margin: 0.5rem;
+}
+
+#rosalind-resizer {
+  width: 10px;
+  background-color: transparent;
+  cursor: col-resize;
+  position: fixed;
+  top: 40px;
+  bottom: 0;
+  z-index: 1000;
+  user-select: none;
+  margin-left: -5px;
+}
+
+#rosalind-resizer::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  bottom: 0;
+  width: 2px;
+  background-color: #00000014;
+  border-radius: 2px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+}
+
+#rosalind-resizer:hover::after {
+  background-color: #0e639c;
+}
+
+#rosalind-repl-header {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #00000005;
+  padding: 6px 12px;
+  border-bottom: 1px solid #0000000f;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#rosalind-repl-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#rosalind-repl-icon {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+#rosalind-repl-header h3 {
+  color: #cccccc;
+  font-size: 12px;
+  margin: 0;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+#rosalind-language-selector {
+  background-color: transparent;
+  color: #0000008c;
+  border: none;
+  width: fit-content;
+  font-weight: 400;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.2s ease;
+  appearance: none;
+  position: relative;
+}
+
+#rosalind-repl-header-left {
+  position: relative;
+}
+
+#rosalind-repl-header-left::after {
+  content: "▾";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #d4d4d4;
+  font-size: 14px;
+}
+
+#rosalind-language-selector:hover {
+  background-color: #0000000f;
+}
+
+#rosalind-repl-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #858585;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+#rosalind-repl-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #666666;
+}
+
+#rosalind-repl-status.ready #rosalind-repl-status-dot {
+  background-color: #4ec9b0;
+}
+
+#rosalind-repl-status.loading #rosalind-repl-status-dot {
+  background-color: #ffc01e;
+}
+
+#rosalind-repl-status.error #rosalind-repl-status-dot {
+  background-color: #f48771;
+}
+
+#rosalind-repl-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: 100%;
+}
+
+#rosalind-code-input {
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: white;
+  border: none;
+  padding: 0;
+  resize: none;
+  outline: none;
+  overflow: hidden;
+
+  font-family: Menlo, Monaco, "Courier New", monospace;
+  font-weight: normal;
+  font-size: 13px;
+  font-feature-settings: "liga" 0, "calt" 0;
+  line-height: 20px;
+  letter-spacing: 0px;
+}
+
+/* CodeMirror styling */
+.cm-editor {
+  height: 100%;
+
+  background-color: white;
+  color: black;
+
+  font-family: Menlo, Monaco, "Courier New", monospace;
+  font-weight: normal;
+  font-size: 13px;
+  font-feature-settings: "liga" 0, "calt" 0;
+  line-height: 20px;
+  letter-spacing: 0px;
+}
+
+.cm-scroller {
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro",
+    monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.cm-gutters {
+  background-color: white;
+  color: #237893;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  box-sizing: border-box;
+}
+
+.cm-foldGutter {
+  display: none;
+}
+
+.cm-lineNumbers {
+  background-color: white;
+  color: #237893;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  box-sizing: border-box;
+}
+
+.pointer + div {
+  display: block !important;
+}
+
+.cm-selectionBackground {
+  background-color: #264f78 !important;
+}
+
+.cm-cursor {
+  border-left-color: #d4d4d4 !important;
+}
+
+.cm-content {
+  caret-color: #d4d4d4 !important;
+  padding: 16px 0 !important;
+}
+
+.cm-line {
+  padding: 0 16px !important;
+}
+
+#rosalind-repl-controls {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #f0f0f0;
+  padding: 12px 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#rosalind-run-btn {
+  background-color: #0e639c !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 4px !important;
+  padding: 8px 20px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+}
+
+#rosalind-run-btn:hover {
+  background-color: #1177bb !important;
+}
+
+#rosalind-run-btn:disabled {
+  background-color: #444444 !important;
+  cursor: not-allowed !important;
+}
+
+#rosalind-clear-btn {
+  background-color: #3e3e3e !important;
+  color: #d4d4d4 !important;
+  border: none !important;
+  border-radius: 4px !important;
+  padding: 8px 16px !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+}
+
+#rosalind-clear-btn:hover {
+  background-color: #4e4e4e !important;
+}
+
+#rosalind-submit-btn {
+  background-color: #10b981 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 4px !important;
+  padding: 8px 16px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+  margin-left: auto !important;
+}
+
+#rosalind-submit-btn:hover {
+  background-color: #059669 !important;
+}
+
+#rosalind-submit-btn:disabled {
+  background-color: #444444 !important;
+  cursor: not-allowed !important;
+}
+
+#rosalind-repl-output {
+  width: 100%;
+  box-sizing: border-box;
+  height: 200px;
+  background-color: #000a2008;
+  color: #d4d4d4;
+  padding: 16px;
+  overflow-y: auto;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro",
+    monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.rosalind-output-line {
+  margin-bottom: 4px;
+}
+
+.rosalind-output-error {
+  color: #f48771;
+}
+
+.rosalind-output-success {
+  color: #262626;
+}
+
+/* Navigation bar */
+.navbar,
+nav {
+  height: 43px;
+  min-height: 43px;
+  max-height: 43px;
+  display: flex;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.navbar-inner {
+  background: none;
+  box-shadow: none !important;
+  width: 100%;
+  padding: 0 0.5rem !important;
+}
+
+.navbar .brand {
+  margin-left: 0px !important;
+}
+
+.navbar-inner .container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.nav-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.nav-collapse a {
+  color: #1a1a1a !important;
+  font-weight: 500 !important;
+}
+
+.navbar-search {
+  margin: 0px !important;
+  flex-grow: 1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.navbar-search input {
+  width: 350px !important;
+}
+
+.divider-vertical {
+  display: none;
+}
+
+.navbar .navbar-brand,
+nav .navbar-brand {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 0 !important;
+  margin-right: 20px !important;
+}
+
+.navbar ul,
+nav ul {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.navbar li,
+nav li {
+  padding: 0 8px !important;
+}
+
+.social-buttons {
+  display: none !important;
+}
+
+/* Main content container */
+.container.main,
+#content {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: scroll;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* Problem tiles/cards */
+.problem-tile,
+.location-tile,
+[class*="tile"] {
+  background-color: #ffffff !important;
+  border: 1px solid #e8e8e8 !important;
+  border-radius: 8px !important;
+  padding: 16px !important;
+  margin: 12px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.3s ease !important;
+}
+
+.problem-tile:hover,
+.location-tile:hover,
+[class*="tile"]:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-2px) !important;
+  border-color: #d0d0d0 !important;
+}
+
+/* Tables - LeetCode style */
+table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  background-color: #ffffff !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+table thead {
+  background-color: #fafafa !important;
+  border-bottom: 1px solid #e8e8e8 !important;
+}
+
+table th {
+  padding: 12px 16px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  color: #262626 !important;
+  text-align: left !important;
+}
+
+table td {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+  font-size: 14px !important;
+}
+
+table tr:hover {
+  background-color: #fafafa !important;
+}
+
+table tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* Links */
+a {
+  color: #1a7ab8 !important;
+  text-decoration: none !important;
+  transition: color 0.2s ease !important;
+}
+
+a:hover {
+  color: #0d5a8f !important;
+}
+
+/* Buttons */
+button,
+.btn,
+input[type="submit"] {
+  background-color: #1a7ab8 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 8px 16px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+}
+
+button:hover,
+.btn:hover,
+input[type="submit"]:hover {
+  background-color: #0d5a8f !important;
+}
+
+.problem-statement {
+  height: 500px;
+  overflow-y: scroll;
+}
+
+.problem-statement > * {
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial,
+    sans-serif, Apple Color Emoji, Segoe UI Emoji !important;
+  line-height: 1.5 !important;
+  font-size: 14px !important;
+}
