@@ -30,10 +30,6 @@ const EXCLUDED_PAGE_PREFIXES = [
   "locations",
 ];
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
 function injectStyles(): void {
   const style = document.createElement("style");
   style.textContent = CSS_STYLES;
@@ -132,20 +128,6 @@ function submitOutputToForm(output: string): void {
 
   // Submit the form
   form.submit();
-}
-
-// ============================================================================
-// External Libraries
-// ============================================================================
-
-function loadPyodideScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js";
-    script.onload = () => resolve();
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
 }
 
 // ============================================================================
@@ -484,6 +466,7 @@ async function runJavaScriptCode(
 // ============================================================================
 
 function createSplitLayout(): EditorElements {
+  const rosalindFooter = Body.byQuery(".footer", true);
   const bodyContent = Body.content;
 
   const splitContainer = Body.DIV({ id: "rosalind-split-container" });
@@ -498,7 +481,6 @@ function createSplitLayout(): EditorElements {
   });
 
   const problemFooter = Body.DIV({ id: "rosalind-problem-footer" });
-  const rosalindFooter = Body.byQuery(".footer", true);
   problemFooter.appendChild(rosalindFooter);
 
   problemSide.appendChild(problemHeader);
@@ -512,8 +494,8 @@ function createSplitLayout(): EditorElements {
       <div id="rosalind-repl-header-left">
         <h3>REPL</h3>
         <select id="rosalind-language-selector">
-          <option value="python">Python</option>
-          <option value="javascript">JavaScript</option>
+          <option value="python">Python ▼</option>
+          <option value="javascript">JavaScript ▼</option>
         </select>
       </div>
       <span id="rosalind-repl-status" class="loading">
@@ -615,20 +597,25 @@ function setupResizer(
 }
 
 function buildSplitPaneHeader(el: HTMLDivElement) {
-  const iconStyle = {
-    width: "75px",
-    display: "flex",
-    height: "fit-content",
-    gap: "3px",
-  };
   const desc = Body.DIV({
     content: `${DESC_SVG} <div>Description</div>`,
-    style: { fontWeight: "500", ...iconStyle },
+    style: {
+      fontWeight: "500",
+      width: "90px",
+      display: "flex",
+      height: "fit-content",
+      gap: "3px",
+    },
   });
   const solutions = Body.A({
     href: "/problems/subs/recent/",
     content: `${SOLUTIONS_SVG} <div>Solutions</div>`,
-    style: { ...iconStyle },
+    style: {
+      width: "75px",
+      display: "flex",
+      height: "fit-content",
+      gap: "3px",
+    },
   });
 
   const next = Body.byQuery("li.next > a");
@@ -666,38 +653,35 @@ function setupStartButton(elements: EditorElements): void {
     downloadLink.style.display = "none";
 
     const datasetUrl = downloadLink.href;
-    const buttonContainer = Body.DIV({
-      css: `
-        display: inline-flex !important;
-        gap: 12px !important;
-        align-items: center !important;
-      `,
-    });
 
-    const startButton = document.createElement("button");
-    startButton.textContent = "Start in REPL";
-    startButton.className = "rosalind-start-btn";
-    startButton.style.cssText = `
-      background-color: #10b981 !important;
-      color: white !important;
-      border: none !important;
-      border-radius: 6px !important;
-      padding: 10px 20px !important;
-      font-weight: 600 !important;
-      font-size: 14px !important;
-      cursor: pointer !important;
-      transition: all 0.2s ease !important;
-      box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2) !important;
-    `;
+    const secondTitleLine = Body.byQuery(".problem-properties");
+    const startButton = Body.BUTTON({
+      content: "start ▶︎",
+      css: `
+        background-color: #46a546 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 5px 10px !important;
+        font-weight: 600 !important;
+        font-size: 14px;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2) !important;
+        margin-left: auto !important;
+      `,
+      classList: ["rosalind-start-btn"],
+    });
+    secondTitleLine.appendChild(startButton);
 
     startButton.addEventListener("mouseenter", () => {
-      startButton.style.backgroundColor = "#059669";
+      startButton.style.backgroundColor = "#059669 !important";
       startButton.style.transform = "translateY(-1px)";
       startButton.style.boxShadow = "0 4px 8px rgba(16, 185, 129, 0.3)";
     });
 
     startButton.addEventListener("mouseleave", () => {
-      startButton.style.backgroundColor = "#10b981";
+      startButton.style.backgroundColor = "#46a546 !important";
       startButton.style.transform = "translateY(0)";
       startButton.style.boxShadow = "0 2px 4px rgba(16, 185, 129, 0.2)";
     });
@@ -750,13 +734,6 @@ function setupStartButton(elements: EditorElements): void {
         startButton.disabled = false;
       }
     });
-
-    const parent = downloadLink.parentNode;
-    if (parent) {
-      parent.insertBefore(buttonContainer, downloadLink);
-      buttonContainer.appendChild(downloadLink);
-      buttonContainer.appendChild(startButton);
-    }
   }, 1000);
 }
 
@@ -845,6 +822,15 @@ function setupStartButton(elements: EditorElements): void {
 
     await initializePyodide(elements);
     setupStartButton(elements);
+
+    if ((window as any).MathJax) {
+      console.log("MathJax found");
+      setTimeout(() => {
+        (window as any).MathJax.Hub.Rerender();
+      }, 1000);
+    } else {
+      console.log("MathJax not found");
+    }
   } catch (error) {
     console.error("Failed to initialize editor:", error);
     addOutput(

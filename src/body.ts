@@ -63,6 +63,9 @@ export class Body {
     if (href) a.href = href;
     return a;
   }
+  static BUTTON(args: Parameters<typeof Body.ELEMENT>[1]) {
+    return Body.ELEMENT<HTMLButtonElement>("button", args);
+  }
 
   static byId<T extends HTMLElement = HTMLElement>(id: string): T {
     const el = document.getElementById(id);
@@ -73,7 +76,7 @@ export class Body {
     remove: boolean = false
   ): T {
     const el = document.querySelector(query);
-    if (remove) el?.remove();
+    if (remove) el?.parentNode?.removeChild(el);
     return el as T;
   }
 

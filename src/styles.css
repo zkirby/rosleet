@@ -23,6 +23,8 @@ small.hide-on-print,
 .problem-properties {
   display: flex;
   justify-content: flex-start;
+  align-items: center;
+  gap: 5px;
 }
 
 .problem-dataset > p {
@@ -84,11 +86,10 @@ small.hide-on-print,
 
 .problem-header-div > * {
   padding: 4px 8px;
-  margin-right: 4px;
 }
 
 .problem-properties p {
-  margin-bottom: 9px !important;
+  margin: 0px !important;
 }
 
 #rosalind-problem-header > * {
@@ -207,17 +208,6 @@ small.hide-on-print,
 
 #rosalind-repl-header-left {
   position: relative;
-}
-
-#rosalind-repl-header-left::after {
-  content: "▾";
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: #d4d4d4;
-  font-size: 14px;
 }
 
 #rosalind-language-selector:hover {
@@ -353,62 +343,58 @@ small.hide-on-print,
 }
 
 #rosalind-run-btn {
-  background-color: #0e639c !important;
-  color: #ffffff !important;
-  border: none !important;
-  border-radius: 4px !important;
-  padding: 8px 20px !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  cursor: pointer !important;
-  transition: background-color 0.2s ease !important;
+  background-color: #0e639c;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
 #rosalind-run-btn:hover {
-  background-color: #1177bb !important;
+  background-color: #1177bb;
 }
 
 #rosalind-run-btn:disabled {
-  background-color: #444444 !important;
-  cursor: not-allowed !important;
+  background-color: #444444;
+  cursor: not-allowed;
 }
 
 #rosalind-clear-btn {
-  background-color: #3e3e3e !important;
-  color: #d4d4d4 !important;
-  border: none !important;
-  border-radius: 4px !important;
-  padding: 8px 16px !important;
-  font-weight: 500 !important;
-  font-size: 13px !important;
-  cursor: pointer !important;
-  transition: background-color 0.2s ease !important;
+  background-color: #3e3e3e;
+  color: #d4d4d4;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
 #rosalind-clear-btn:hover {
-  background-color: #4e4e4e !important;
+  background-color: #4e4e4e;
 }
 
 #rosalind-submit-btn {
-  background-color: #10b981 !important;
-  color: #ffffff !important;
-  border: none !important;
-  border-radius: 4px !important;
-  padding: 8px 16px !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  cursor: pointer !important;
-  transition: background-color 0.2s ease !important;
-  margin-left: auto !important;
-}
-
-#rosalind-submit-btn:hover {
-  background-color: #059669 !important;
+  background-color: #46a546;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-left: auto;
 }
 
 #rosalind-submit-btn:disabled {
-  background-color: #444444 !important;
-  cursor: not-allowed !important;
+  background-color: #444444;
+  cursor: not-allowed;
 }
 
 #rosalind-repl-output {
@@ -602,28 +588,8 @@ a:hover {
   color: #0d5a8f !important;
 }
 
-/* Buttons */
-button,
-.btn,
-input[type="submit"] {
-  background-color: #1a7ab8 !important;
-  color: #ffffff !important;
-  border: none !important;
-  border-radius: 6px !important;
-  padding: 8px 16px !important;
-  font-weight: 500 !important;
-  cursor: pointer !important;
-  transition: background-color 0.2s ease !important;
-}
-
-button:hover,
-.btn:hover,
-input[type="submit"]:hover {
-  background-color: #0d5a8f !important;
-}
-
 .problem-statement {
-  height: 500px;
+  height: 425px;
   overflow-y: scroll;
 }
 
