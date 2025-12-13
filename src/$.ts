@@ -1,41 +1,48 @@
 import { CSSProperties } from "./types";
 
 /**
- * Simple wrapper around DOM APIs for improve ergonomics
+ * Simple wrapper around DOM APIs for improved ergonomics
+ * over the most commonly used APIs.
  */
-export class QueryWrapper {
-  constructor(private readonly element: Element = document.body) {
+export class QueryWrapper<TEl extends HTMLElement = HTMLElement> {
+  constructor(public readonly el: TEl = document.body as TEl) {
     if (document == null || document.body == null) {
       throw new Error("Document or body not found");
     }
   }
 
   get content() {
-    return this.element.innerHTML;
+    return this.el.innerHTML;
   }
 
-  DANGEROUSLY_set_content(content: Node) {
-    this.element.innerHTML = "";
-    this.element.appendChild(content);
+  append(node: Node | QueryWrapper) {
+    return this.el.appendChild(QueryWrapper.unwrap(node));
+  }
+
+  DANGEROUSLY_set_content(content: Node | QueryWrapper) {
+    this.el.innerHTML = "";
+    this.el.appendChild(QueryWrapper.unwrap(content));
   }
 
   byQuery<T extends HTMLElement = HTMLElement>(
     query: string,
     remove: boolean = false
   ): T {
-    const el = this.element.querySelector(query);
+    const el = this.el.querySelector(query);
     if (remove) el?.parentNode?.removeChild(el);
     return el as T;
   }
-
   queryAll<T extends HTMLElement = HTMLElement>(query: string): T[] {
-    const els = this.element.querySelectorAll(query);
+    const els = this.el.querySelectorAll(query);
     return Array.from(els) as T[];
   }
-
   static byId<T extends HTMLElement = HTMLElement>(id: string): T {
     const el = document.getElementById(id);
     return el as T;
+  }
+
+  private static unwrap(node: Node | QueryWrapper) {
+    return node instanceof QueryWrapper ? node.el : node;
   }
 
   private static ELEMENT<T extends HTMLElement>(
@@ -68,7 +75,7 @@ export class QueryWrapper {
       }
     }
     if (css) d.style.cssText = css;
-    return d;
+    return new QueryWrapper(d);
   }
 
   static DIV(args: Parameters<typeof QueryWrapper.ELEMENT>[1]) {
@@ -79,7 +86,7 @@ export class QueryWrapper {
     ...args
   }: { href: string } & Parameters<typeof QueryWrapper.ELEMENT>[1]) {
     const a = QueryWrapper.ELEMENT<HTMLAnchorElement>("a", args);
-    if (href) a.href = href;
+    if (href) a.el.href = href;
     return a;
   }
   static BUTTON(args: Parameters<typeof QueryWrapper.ELEMENT>[1]) {
@@ -87,5 +94,5 @@ export class QueryWrapper {
   }
 }
 
-export const $ = (el?: Element) => new QueryWrapper(el);
+export const $ = (el?: HTMLElement) => new QueryWrapper(el);
 export const $$ = QueryWrapper;

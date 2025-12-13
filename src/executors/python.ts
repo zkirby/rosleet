@@ -11,7 +11,7 @@ export class PythonRunner implements Runner {
   /** Internal pyodide interface */
   private pyodide: PyodideInterface | null = null;
 
-  async init() {
+  async init(dataset: string) {
     if (this.initialized) return;
 
     await new Promise((resolve, reject) => {
@@ -43,10 +43,13 @@ export class PythonRunner implements Runner {
   sys.stderr = io.StringIO()
       `);
 
+    this.pyodide.globals.set("dataset", dataset);
+
     this.initialized = true;
   }
 
-  public getSkeleton(dataset: string): string {
+  public getSkeleton(): string {
+    const dataset = this.pyodide?.globals.get("dataset");
     const lines = dataset.trim().split("\n");
     const firstLine = lines[0];
     const hasCommas = firstLine.includes(",");

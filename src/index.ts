@@ -1,25 +1,10 @@
-import type {
-  EditorElements,
-  Language,
-  OutputType,
-  PyodideInterface,
-  StatusState,
-  WindowWithExtensions,
-} from "./types";
+import type { EditorElements } from "./types";
 import CSS_STYLES from "./styles.css";
-import { $ } from "./$";
+import { $, $$, QueryWrapper } from "./$";
 import DESC_SVG from "./desc-icon.svg";
 import SOLUTIONS_SVG from "./lab-icon.svg";
 import { DB } from "./db";
 import { Editor } from "./editor";
-
-// GLOBALS
-let pyodide: PyodideInterface | null = null;
-let editorView: any = null;
-let currentLanguage: Language = "python";
-let editorContainer: HTMLElement | null = null;
-let onRunCodeCallback: (() => void) | null = null;
-const Body = $();
 
 /**
  * Excluded page sub-paths that shouldn't show the REPL view.
@@ -31,6 +16,57 @@ const EXCLUDED_PAGE_PREFIXES = [
   "locations",
 ];
 
+(async function main() {
+  "use strict";
+
+  const isExcludedPage = EXCLUDED_PAGE_PREFIXES.some((prefix) =>
+    window.location.pathname.includes(`problems/${prefix}`)
+  );
+  if (isExcludedPage) {
+    console.log("Rosalind LeetCode Style loaded (excluded page - no REPL)");
+    return;
+  }
+
+  injectStyles();
+
+  // Create the split pane layout
+  const elements = createSplitLayout();
+  setupResizer(
+    elements.resizer,
+    elements.replPanel,
+    elements.updateResizerPosition
+  );
+
+  const editor = new Editor(elements);
+
+  try {
+    // Setup editor
+    await editor.init();
+
+    setupStartButton(editor);
+
+    // Reset MathJax formatting
+    if ((window as any).MathJax) {
+      console.log("MathJax found");
+      setTimeout(() => {
+        (window as any).MathJax.Hub.Rerender();
+      }, 1000);
+    } else {
+      console.log("MathJax not found");
+    }
+  } catch (error) {
+    console.error("Failed to initialize editor:", error);
+    editor.addOutput(
+      `Failed to initialize editor: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
+      "error"
+    );
+  }
+
+  console.log("Rosalind LeetCode Style with Python REPL loaded!");
+})();
+
 function injectStyles(): void {
   const style = document.createElement("style");
   style.textContent = CSS_STYLES;
@@ -38,213 +74,32 @@ function injectStyles(): void {
 }
 
 // ============================================================================
-// Pyodide/Python REPL
+// Layouts
 // ============================================================================
-
-async function initializePyodide(elements: EditorElements): Promise<void> {
-  try {
-    updateStatus(elements.status, "loading", "Initializing...");
-    const win = window as WindowWithExtensions;
-
-    if (!win.loadPyodide) {
-      throw new Error("Pyodide loader not found");
-    }
-
-    pyodide = await win.loadPyodide({
-      indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/",
-    });
-
-    if (!pyodide) {
-      throw new Error("Failed to initialize Pyodide");
-    }
-
-    pyodide.runPython(`
-import sys
-import io
-sys.stdout = io.StringIO()
-sys.stderr = io.StringIO()
-    `);
-
-    updateStatus(elements.status, "ready", "Ready");
-    elements.runBtn.disabled = false;
-    addOutput(elements.output, "✓ Python REPL ready.", "success");
-  } catch (error) {
-    updateStatus(elements.status, "error", "Error");
-    addOutput(
-      elements.output,
-      `Failed to load Python: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`,
-      "error"
-    );
-  }
-}
-
-async function runPythonCode(
-  code: string,
-  elements: EditorElements
-): Promise<void> {
-  if (!pyodide) {
-    addOutput(
-      elements.output,
-      "Python not loaded yet. Please wait...",
-      "error"
-    );
-    return;
-  }
-
-  try {
-    elements.runBtn.disabled = true;
-    elements.runBtn.textContent = "Running...";
-
-    pyodide.runPython(`
-sys.stdout = io.StringIO()
-sys.stderr = io.StringIO()
-    `);
-
-    const result = await pyodide.runPythonAsync(code);
-    const stdout = pyodide.runPython("sys.stdout.getvalue()");
-    const stderr = pyodide.runPython("sys.stderr.getvalue()");
-
-    addOutput(elements.output, ">>> Running code...", "success");
-
-    if (stdout) {
-      addOutput(elements.output, stdout);
-    }
-
-    if (stderr) {
-      addOutput(elements.output, stderr, "error");
-    }
-
-    if (result !== undefined && result !== null) {
-      addOutput(elements.output, `Result: ${result}`);
-    }
-
-    addOutput(elements.output, ">>> Done.", "success");
-  } catch (error) {
-    addOutput(
-      elements.output,
-      `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-      "error"
-    );
-  } finally {
-    elements.runBtn.disabled = false;
-    elements.runBtn.textContent = "Run Code";
-  }
-}
-
-async function runJavaScriptCode(
-  code: string,
-  elements: EditorElements
-): Promise<void> {
-  try {
-    elements.runBtn.disabled = true;
-    elements.runBtn.textContent = "Running...";
-
-    // Capture console output
-    const logs: string[] = [];
-    const errors: string[] = [];
-
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
-
-    console.log = (...args: any[]) => {
-      logs.push(
-        args
-          .map((arg) =>
-            typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg)
-          )
-          .join(" ")
-      );
-    };
-
-    console.error = (...args: any[]) => {
-      errors.push(args.map((arg) => String(arg)).join(" "));
-    };
-
-    console.warn = (...args: any[]) => {
-      logs.push("[Warning] " + args.map((arg) => String(arg)).join(" "));
-    };
-
-    addOutput(elements.output, ">>> Running code...", "success");
-
-    try {
-      // Use AsyncFunction to support await
-      const AsyncFunction = Object.getPrototypeOf(
-        async function () {}
-      ).constructor;
-      // Make dataset available in function scope
-      const dataset = (window as any).dataset;
-      const fn = new AsyncFunction("dataset", code);
-      const result = await fn(dataset);
-
-      // Display console output
-      if (logs.length > 0) {
-        addOutput(elements.output, logs.join("\n"));
-      }
-
-      if (errors.length > 0) {
-        addOutput(elements.output, errors.join("\n"), "error");
-      }
-
-      // Display return value if not undefined
-      if (result !== undefined) {
-        addOutput(
-          elements.output,
-          `Result: ${
-            typeof result === "object"
-              ? JSON.stringify(result, null, 2)
-              : result
-          }`
-        );
-      }
-
-      addOutput(elements.output, ">>> Done.", "success");
-    } catch (error) {
-      addOutput(
-        elements.output,
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        "error"
-      );
-    } finally {
-      // Restore console
-      console.log = originalLog;
-      console.error = originalError;
-      console.warn = originalWarn;
-    }
-  } finally {
-    elements.runBtn.disabled = false;
-    elements.runBtn.textContent = "Run Code";
-  }
-}
-
-// ============================================================================
-// Layout & UI
-// ============================================================================
+const Body = $();
 
 function createSplitLayout(): EditorElements {
   const rosalindFooter = Body.byQuery(".footer", true);
 
-  const splitContainer = $.DIV({ id: "rosalind-split-container" });
-  const problemSide = $.DIV({ id: "rosalind-problem-side" });
-  const problemHeader = $.DIV({ id: "rosalind-problem-header" });
+  const splitContainer = $$.DIV({ id: "rosalind-split-container" });
+  const problemSide = $$.DIV({ id: "rosalind-problem-side" });
+  const problemHeader = $$.DIV({ id: "rosalind-problem-header" });
 
   buildSplitPaneHeader(problemHeader);
 
-  const mainContent = $.DIV({
+  const mainContent = $$.DIV({
     id: "rosalind-main-content",
     content: Body.content,
   });
 
-  const problemFooter = $.DIV({ id: "rosalind-problem-footer" });
-  problemFooter.appendChild(rosalindFooter);
+  const problemFooter = $$.DIV({ id: "rosalind-problem-footer" });
+  problemFooter.append(rosalindFooter);
 
-  problemSide.appendChild(problemHeader);
-  problemSide.appendChild(mainContent);
-  problemSide.appendChild(problemFooter);
+  problemSide.append(problemHeader);
+  problemSide.append(mainContent);
+  problemSide.append(problemFooter);
 
-  const replPanel = $.DIV({
+  const replPanel = $$.DIV({
     id: "rosalind-repl-panel",
     content: `
     <div id="rosalind-repl-header">
@@ -270,15 +125,15 @@ function createSplitLayout(): EditorElements {
     </div>
     <div id="rosalind-repl-output"></div>
   `,
-  });
+  }).el;
 
-  splitContainer.appendChild(problemSide);
-  splitContainer.appendChild(replPanel);
+  splitContainer.append(problemSide);
+  splitContainer.append(replPanel);
 
   Body.DANGEROUSLY_set_content(splitContainer);
 
-  const resizer = $.DIV({ id: "rosalind-resizer" });
-  document.body.appendChild(resizer);
+  const resizer = $$.DIV({ id: "rosalind-resizer" }).el;
+  Body.append(resizer);
 
   const updateResizerPosition = () => {
     const panelWidth = replPanel.offsetWidth;
@@ -289,17 +144,59 @@ function createSplitLayout(): EditorElements {
   updateResizerPosition();
 
   return {
-    runBtn: $.byId<HTMLButtonElement>("rosalind-run-btn"),
-    clearBtn: $.byId<HTMLButtonElement>("rosalind-clear-btn"),
-    submitBtn: $.byId<HTMLButtonElement>("rosalind-submit-btn"),
-    languageSelector: $.byId<HTMLSelectElement>("rosalind-language-selector"),
-    codeInput: $.byId<HTMLElement>("rosalind-code-input"),
-    output: $.byId<HTMLElement>("rosalind-repl-output"),
-    status: $.byId<HTMLElement>("rosalind-repl-status"),
+    runBtn: $$.byId<HTMLButtonElement>("rosalind-run-btn"),
+    clearBtn: $$.byId<HTMLButtonElement>("rosalind-clear-btn"),
+    submitBtn: $$.byId<HTMLButtonElement>("rosalind-submit-btn"),
+    languageSelector: $$.byId<HTMLSelectElement>("rosalind-language-selector"),
+    codeInput: $$.byId<HTMLElement>("rosalind-code-input"),
+    output: $$.byId<HTMLElement>("rosalind-repl-output"),
+    status: $$.byId<HTMLElement>("rosalind-repl-status"),
     resizer,
     replPanel,
     updateResizerPosition,
   };
+}
+
+function buildSplitPaneHeader(el: QueryWrapper) {
+  const desc = $$.DIV({
+    content: `${DESC_SVG} <div>Description</div>`,
+    style: {
+      fontWeight: "500",
+      width: "90px",
+      display: "flex",
+      height: "fit-content",
+      gap: "3px",
+    },
+  });
+  const solutions = $$.A({
+    href: "/problems/subs/recent/",
+    content: `${SOLUTIONS_SVG} <div>Solutions</div>`,
+    style: {
+      width: "75px",
+      display: "flex",
+      height: "fit-content",
+      gap: "3px",
+    },
+  });
+
+  const next = Body.byQuery("li.next > a");
+  const prev = Body.byQuery("li.previous > a");
+
+  const left = $$.DIV({
+    classList: ["problem-header-div"],
+  });
+  const right = $$.DIV({
+    classList: ["problem-header-div"],
+  });
+
+  left.append(desc);
+  left.append(solutions);
+
+  right.append(prev);
+  right.append(next);
+
+  el.append(left);
+  el.append(right);
 }
 
 function setupResizer(
@@ -315,8 +212,8 @@ function setupResizer(
     isResizing = true;
     startX = e.clientX;
     startWidth = replPanel.offsetWidth;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
+    Body.el.style.cursor = "col-resize";
+    Body.el.style.userSelect = "none";
     e.preventDefault();
   };
 
@@ -339,8 +236,8 @@ function setupResizer(
   const stopResize = () => {
     if (isResizing) {
       isResizing = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
+      Body.el.style.cursor = "";
+      Body.el.style.userSelect = "";
     }
   };
 
@@ -351,55 +248,9 @@ function setupResizer(
   window.addEventListener("resize", updateResizerPosition);
 }
 
-function buildSplitPaneHeader(el: HTMLDivElement) {
-  const desc = $.DIV({
-    content: `${DESC_SVG} <div>Description</div>`,
-    style: {
-      fontWeight: "500",
-      width: "90px",
-      display: "flex",
-      height: "fit-content",
-      gap: "3px",
-    },
-  });
-  const solutions = $.A({
-    href: "/problems/subs/recent/",
-    content: `${SOLUTIONS_SVG} <div>Solutions</div>`,
-    style: {
-      width: "75px",
-      display: "flex",
-      height: "fit-content",
-      gap: "3px",
-    },
-  });
-
-  const next = $.byQuery("li.next > a");
-  const prev = $.byQuery("li.previous > a");
-
-  const left = $.DIV({
-    classList: ["problem-header-div"],
-  });
-  const right = $.DIV({
-    classList: ["problem-header-div"],
-  });
-
-  left.appendChild(desc);
-  left.appendChild(solutions);
-
-  right.appendChild(prev);
-  right.appendChild(next);
-
-  el.appendChild(left);
-  el.appendChild(right);
-}
-
-// ============================================================================
-// Dataset Loading
-// ============================================================================
-
-function setupStartButton(elements: EditorElements): void {
+function setupStartButton(editor: Editor): void {
   setTimeout(() => {
-    const downloadLink = $.byQuery<HTMLAnchorElement>(
+    const downloadLink = Body.byQuery<HTMLAnchorElement>(
       "a#id_problem_dataset_link"
     );
     if (!downloadLink) return;
@@ -409,8 +260,8 @@ function setupStartButton(elements: EditorElements): void {
 
     const datasetUrl = downloadLink.href;
 
-    const secondTitleLine = $.byQuery(".problem-properties");
-    const startButton = $.BUTTON({
+    const secondTitleLine = $(Body.byQuery(".problem-properties"));
+    const startButton = $$.BUTTON({
       content: "start ▶︎",
       css: `
         background-color: #46a546 !important;
@@ -426,8 +277,8 @@ function setupStartButton(elements: EditorElements): void {
         margin-left: auto !important;
       `,
       classList: ["rosalind-start-btn"],
-    });
-    secondTitleLine.appendChild(startButton);
+    }).el;
+    secondTitleLine.append(startButton);
 
     startButton.addEventListener("mouseenter", () => {
       startButton.style.backgroundColor = "#059669 !important";
@@ -453,32 +304,13 @@ function setupStartButton(elements: EditorElements): void {
         const response = await fetch(datasetUrl);
         const datasetText = await response.text();
 
-        // Inject dataset into execution environment
-        if (currentLanguage === "python") {
-          // Inject into Python globals
-          if (pyodide) {
-            pyodide.globals.set("dataset", datasetText);
-          }
-        } else {
-          // Inject into JavaScript global scope
-          (window as any).dataset = datasetText;
-        }
-
-        const code = Editor.getSkeleton(datasetText);
-
-        setEditorContent(code);
-        addOutput(
-          elements.output,
-          "✓ Dataset loaded! Ready to analyze.",
-          "success"
-        );
+        editor.start(datasetText);
 
         startButton.textContent = "Reload Dataset";
         startButton.style.backgroundColor = "#10b981";
         startButton.disabled = false;
       } catch (error) {
-        addOutput(
-          elements.output,
+        editor.addOutput(
           `Error loading dataset: ${
             error instanceof Error ? error.message : "Unknown error"
           }`,
@@ -491,111 +323,3 @@ function setupStartButton(elements: EditorElements): void {
     });
   }, 1000);
 }
-
-// ============================================================================
-// __main__
-// ============================================================================
-
-(async function main() {
-  "use strict";
-
-  const isExcludedPage = EXCLUDED_PAGE_PREFIXES.some((prefix) =>
-    window.location.pathname.includes(`problems/${prefix}`)
-  );
-  if (isExcludedPage) {
-    console.log("Rosalind LeetCode Style loaded (excluded page - no REPL)");
-    return;
-  }
-
-  injectStyles();
-
-  // Step 1: Create the split layout right away
-  const elements = createSplitLayout();
-  setupResizer(
-    elements.resizer,
-    elements.replPanel,
-    elements.updateResizerPosition
-  );
-
-  try {
-    // Load language preference before initializing editor
-    currentLanguage = DB.get(DB.KEYS.LANGUAGE_PREFERENCE, "python");
-    elements.languageSelector.value = currentLanguage;
-
-    await Editor.init();
-
-    const runCode = () => {
-      const code = getEditorContent();
-      if (currentLanguage === "python") {
-        runPythonCode(code, elements);
-      } else {
-        runJavaScriptCode(code, elements);
-      }
-    };
-
-    initializeCodeMirror(elements.codeInput, runCode);
-
-    // Language selector handler
-    elements.languageSelector.addEventListener("change", (e) => {
-      const target = e.target as HTMLSelectElement;
-      const language = target.value as Language;
-      switchLanguage(language);
-    });
-
-    elements.runBtn.addEventListener("click", runCode);
-    elements.clearBtn.addEventListener("click", () => {
-      elements.output.innerHTML = "";
-    });
-
-    elements.submitBtn.addEventListener("click", () => {
-      try {
-        const output = getLastOutput(elements.output);
-        if (!output) {
-          addOutput(
-            elements.output,
-            "No output to submit. Run your code first.",
-            "error"
-          );
-          return;
-        }
-        submitOutputToForm(output);
-        addOutput(
-          elements.output,
-          "✓ Output submitted successfully!",
-          "success"
-        );
-      } catch (error) {
-        addOutput(
-          elements.output,
-          `Failed to submit: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
-          "error"
-        );
-      }
-    });
-
-    await initializePyodide(elements);
-    setupStartButton(elements);
-
-    if ((window as any).MathJax) {
-      console.log("MathJax found");
-      setTimeout(() => {
-        (window as any).MathJax.Hub.Rerender();
-      }, 1000);
-    } else {
-      console.log("MathJax not found");
-    }
-  } catch (error) {
-    console.error("Failed to initialize editor:", error);
-    addOutput(
-      elements.output,
-      `Failed to initialize editor: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`,
-      "error"
-    );
-  }
-
-  console.log("Rosalind LeetCode Style with Python REPL loaded!");
-})();

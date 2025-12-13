@@ -11,10 +11,10 @@ export abstract class Runner {
   public initialized: boolean;
 
   /** initialize the runner if needed */
-  public async init(): void;
+  public async init(dataset: string): void;
 
   /** skeleton starter code */
-  public getSkeleton(dataset: string): string;
+  public getSkeleton(): string;
 
   /** Runs the code */
   public async *run(code: string): AsyncGenerator<Output, void, unknown>;

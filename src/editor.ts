@@ -1,5 +1,7 @@
 import { $, $$ } from "./$";
 import { DB } from "./db";
+import { JavaScriptRunner } from "./executors/javascript";
+import { PythonRunner } from "./executors/python";
 import { Runner } from "./executors/runner";
 import {
   EditorElements,
@@ -18,19 +20,22 @@ const TextToState: Record<StatusState, string> = {
 
 /**
  * Generic editor class abstraction over CodeMirror and Pyodide
- *
- * TODO: clean this up to split out the javascript and python runners
- * into standalone abstractions so others can be added in the future.
  */
 export class Editor {
-  private view: any;
-  private runner: Runner | null = null;
+  private view: any; // EditorView from CodeMirror
+  private dataset: string = "";
+  // In a given session, if ths user switches languages multiple times
+  // avoid re-initing the runner;
+  private _runnerCache: Record<Language, Runner> = {
+    python: new PythonRunner(),
+    javascript: new JavaScriptRunner(),
+  };
 
   constructor(private elements: EditorElements) {}
 
   async init(): Promise<void> {
     // Setup CodeMirror
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.type = "module";
       script.textContent = `
@@ -51,6 +56,21 @@ export class Editor {
       script.onerror = reject;
       document.head.appendChild(script);
     });
+
+    // Set up the language
+    const { languageSelector } = this.elements;
+    languageSelector.value = this.language;
+    languageSelector.addEventListener("change", (e) => {
+      const target = e.target as HTMLSelectElement;
+      this.language = target.value as Language;
+    });
+    // TODO: set up the runner
+
+    // Set up cntrl buttons
+    const { runBtn, clearBtn, submitBtn, output } = this.elements;
+    runBtn.addEventListener("click", this.run);
+    clearBtn.addEventListener("click", this.clear);
+    submitBtn.addEventListener("click", this.submit);
   }
 
   get content(): string {
@@ -74,39 +94,83 @@ export class Editor {
   }
 
   set language(language: Language) {
-    // Save current content
-    const currentContent = this.content;
-
-    // Destroy old editor
-    this.view.destroy();
-
     // Update language
     DB.save(DB.KEYS.LANGUAGE_PREFERENCE, language);
 
-    // Transfer dataset to new language environment if it exists
-    if (language === "python") {
-      const jsDataset = (window as any).dataset;
-      if (jsDataset && this.pyodide) {
-        this.pyodide.globals.set("dataset", jsDataset);
-      }
-    } else {
-      // JavaScript - dataset should already be in window scope
-      // No action needed
-    }
-
-    const shouldPreserveContent =
-      !currentContent.includes("Click 'Start in REPL'") &&
-      currentContent.trim() !== "";
-    const newDoc = shouldPreserveContent ? currentContent : undefined;
-
-    this.createEditor(newDoc);
+    // Reset the editor
+    this.reset(language);
   }
 
-  createEditor(initialDoc?: string) {
+  async initRunner(dataset: string) {
+    const runner = this._runnerCache[this.language];
+    if (!runner.initialized) {
+      await runner.init(dataset);
+    }
+  }
+
+  get runner() {
+    return this._runnerCache[this.language];
+  }
+
+  clear() {
+    this.elements.output.innerHTML = "";
+  }
+
+  /** Run the code in the editor */
+  async run() {
+    const runner = this.runner;
+    if (runner == null) {
+      this.addOutput("Editor hasn't finished loading yet...", "error");
+      return;
+    }
+    const code = this.getLastOutput();
+    if (code.trim() == "") {
+      this.addOutput("Nothing to run...", "error");
+      return;
+    }
+
+    const { runBtn } = this.elements;
+    runBtn.disabled = true;
+    runBtn.textContent = "Running...";
+    this.clear();
+
+    try {
+      for await (const { type, text } of runner.run(code)) {
+        this.addOutput(text, type);
+      }
+    } catch (error) {
+      this.addOutput(
+        `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "error"
+      );
+      return;
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = "Run Code";
+    }
+  }
+
+  /** Start the problem in the editor */
+  async start(dataset: string) {
+    this.dataset = dataset;
+
+    if (this.runner == null) {
+      await this.initRunner(dataset);
+    }
+
+    this.content = this.runner!.getSkeleton();
+    this.addOutput("✓ Dataset loaded! Ready to analyze.", "success");
+  }
+
+  /** reset the editor after a language change */
+  async reset(language: Language) {
     const win = window as WindowWithExtensions;
     if (!win.CodeMirrorSetup) {
       throw new Error("CodeMirror not loaded");
     }
+
+    // Remove the old editor
+    this.view.destroy();
 
     const {
       EditorView,
@@ -118,11 +182,13 @@ export class Editor {
       indentWithTab,
     } = win.CodeMirrorSetup;
 
-    const languageExtension =
-      this.language === "python" ? python() : javascript();
-    const defaultDocs = {
+    const defaultDocs: Record<Language, string> = {
       python: "# Click 'Start in REPL' to start the challenge...\n",
       javascript: "// Click 'Start in REPL' to start the challenge...\n",
+    };
+    const extension: Record<Language, () => void> = {
+      python,
+      javascript,
     };
 
     const runCodeKeymap = keymap.of([
@@ -130,15 +196,13 @@ export class Editor {
       {
         key: "Ctrl-Enter",
         mac: "Cmd-Enter",
-        run: () => {
-          return true;
-        },
+        run: this.run,
       },
     ]);
 
     // Load saved code if available, otherwise use provided initialDoc or default
-    const savedCode = DB.get(DB.KEYS.CODE, "");
-    const docToUse = initialDoc || savedCode || defaultDocs[this.language];
+    const savedCode = DB.get(`${DB.KEYS.CODE}${language}`);
+    const docToUse = savedCode || defaultDocs[this.language];
 
     // Create update listener to save code on changes
     const saveOnUpdate = EditorView.updateListener.of((update: any) => {
@@ -148,11 +212,15 @@ export class Editor {
       }
     });
 
+    // Initialize the new runner if needed
+    await this.initRunner(this.dataset);
+
+    // Reset the view
     this.view = new EditorView({
       doc: docToUse,
       extensions: [
         basicSetup,
-        languageExtension,
+        extension[language](),
         indentUnit.of("    "),
         runCodeKeymap,
         saveOnUpdate,
@@ -168,63 +236,6 @@ export class Editor {
       ],
       parent: this.elements.codeInput,
     });
-  }
-
-  /** Return the skeleton starter code */
-  getSkeleton(dataset: string): string {
-    const language = DB.get(DB.KEYS.LANGUAGE_PREFERENCE, "python");
-    const lines = dataset.trim().split("\n");
-    const firstLine = lines[0];
-    const hasCommas = firstLine.includes(",");
-    const hasTabs = firstLine.includes("\t");
-
-    if (language === "python") {
-      if (hasCommas || hasTabs) {
-        const separator = hasTabs ? "\\t" : ",";
-        return `import pandas as pd
-      import io
-      
-      # Dataset is pre-loaded in 'dataset' variable
-      # Uncomment to view: print(dataset[:200])
-      
-      # Load into pandas DataFrame
-      df = pd.read_csv(io.StringIO(dataset), sep='${separator}')
-      
-      print("Dataset shape:", df.shape)
-      print(df.head())
-      
-      # Your analysis code here
-      `;
-      }
-
-      return `# Dataset is pre-loaded in 'dataset' variable
-      # Uncomment to view: print(dataset[:200])
-      
-      # Your analysis code here
-      `;
-    } else {
-      if (hasCommas || hasTabs) {
-        const separator = hasTabs ? "\\t" : ",";
-        return `// Dataset is pre-loaded in 'dataset' variable
-// Uncomment to view: console.log(dataset.substring(0, 200))
-
-// Parse CSV/TSV
-const lines = dataset.trim().split('\\n');
-const data = lines.map(line => line.split('${separator}'));
-
-console.log('Dataset shape:', data.length, 'rows');
-console.log('First few rows:', data.slice(0, 5));
-
-// Your analysis code here
-`;
-      }
-
-      return `// Dataset is pre-loaded in 'dataset' variable
-// Uncomment to view: console.log(dataset.substring(0, 200))
-
-// Your analysis code here
-`;
-    }
   }
 
   /** Update the editors status */
@@ -248,7 +259,7 @@ console.log('First few rows:', data.slice(0, 5));
           : "",
       ],
     });
-    output.appendChild(line);
+    output.appendChild(line.el);
     output.scrollTop = output.scrollHeight;
   }
 
@@ -292,25 +303,39 @@ console.log('First few rows:', data.slice(0, 5));
   }
 
   submit() {
-    const form = $$.byId<HTMLFormElement>("id_form_submission");
-    const input = $$.byId<HTMLInputElement>("id_output_file");
-
-    if (!form || !input) {
-      throw new Error("Submission form or file input not found");
+    const output = this.getLastOutput();
+    if (!output) {
+      this.addOutput("No output to submit. Run your code first.", "error");
+      return;
     }
 
-    const output = this.getLastOutput();
+    try {
+      const form = $$.byId<HTMLFormElement>("id_form_submission");
+      const input = $$.byId<HTMLInputElement>("id_output_file");
 
-    // Create a File object from the output string
-    const blob = new Blob([output], { type: "text/plain" });
-    const file = new File([blob], "output.txt", { type: "text/plain" });
+      if (!form || !input) {
+        throw new Error("Submission form or file input not found");
+      }
 
-    // Create a DataTransfer to set the file
-    const dataTransfer = new DataTransfer();
-    dataTransfer.items.add(file);
-    input.files = dataTransfer.files;
+      // Create a File object from the output string
+      const blob = new Blob([output], { type: "text/plain" });
+      const file = new File([blob], "output.txt", { type: "text/plain" });
 
-    // Submit the form
-    form.submit();
+      // Create a DataTransfer to set the file
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      input.files = dataTransfer.files;
+
+      // Submit the form
+      form.submit();
+      this.addOutput("✓ Output submitted successfully!", "success");
+    } catch (error) {
+      this.addOutput(
+        `Failed to submit: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        "error"
+      );
+    }
   }
 }

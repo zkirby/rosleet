@@ -28,6 +28,10 @@ export class DB {
 
   static get<T>(key: keyof typeof DB.KEYS, defaultValue: T): T;
   static get<T>(
+    key: `${keyof typeof DB.KEYS}${string}`,
+    defaultValue?: T
+  ): T | null;
+  static get<T>(
     key: keyof typeof DB.KEYS,
     defaultValue: T | null = null
   ): T | null {
