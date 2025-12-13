@@ -76,10 +76,8 @@ function injectStyles(): void {
 // ============================================================================
 // Layouts
 // ============================================================================
-const Body = $();
-
 function createSplitLayout(): EditorElements {
-  const rosalindFooter = Body.byQuery(".footer", true);
+  const rosalindFooter = $().byQuery(".footer", true);
 
   const splitContainer = $$.DIV({ id: "rosalind-split-container" });
   const problemSide = $$.DIV({ id: "rosalind-problem-side" });
@@ -89,7 +87,7 @@ function createSplitLayout(): EditorElements {
 
   const mainContent = $$.DIV({
     id: "rosalind-main-content",
-    content: Body.content,
+    content: $().content,
   });
 
   const problemFooter = $$.DIV({ id: "rosalind-problem-footer" });
@@ -130,10 +128,10 @@ function createSplitLayout(): EditorElements {
   splitContainer.append(problemSide);
   splitContainer.append(replPanel);
 
-  Body.DANGEROUSLY_set_content(splitContainer);
+  $().DANGEROUSLY_set_content(splitContainer);
 
   const resizer = $$.DIV({ id: "rosalind-resizer" }).el;
-  Body.append(resizer);
+  $().append(resizer);
 
   const updateResizerPosition = () => {
     const panelWidth = replPanel.offsetWidth;
@@ -179,8 +177,8 @@ function buildSplitPaneHeader(el: QueryWrapper) {
     },
   });
 
-  const next = Body.byQuery("li.next > a");
-  const prev = Body.byQuery("li.previous > a");
+  const next = $().byQuery("li.next > a");
+  const prev = $().byQuery("li.previous > a");
 
   const left = $$.DIV({
     classList: ["problem-header-div"],
@@ -212,8 +210,8 @@ function setupResizer(
     isResizing = true;
     startX = e.clientX;
     startWidth = replPanel.offsetWidth;
-    Body.el.style.cursor = "col-resize";
-    Body.el.style.userSelect = "none";
+    $().el.style.cursor = "col-resize";
+    $().el.style.userSelect = "none";
     e.preventDefault();
   };
 
@@ -236,8 +234,8 @@ function setupResizer(
   const stopResize = () => {
     if (isResizing) {
       isResizing = false;
-      Body.el.style.cursor = "";
-      Body.el.style.userSelect = "";
+      $().el.style.cursor = "";
+      $().el.style.userSelect = "";
     }
   };
 
@@ -250,7 +248,7 @@ function setupResizer(
 
 function setupStartButton(editor: Editor): void {
   setTimeout(() => {
-    const downloadLink = Body.byQuery<HTMLAnchorElement>(
+    const downloadLink = $().byQuery<HTMLAnchorElement>(
       "a#id_problem_dataset_link"
     );
     if (!downloadLink) return;
@@ -260,7 +258,7 @@ function setupStartButton(editor: Editor): void {
 
     const datasetUrl = downloadLink.href;
 
-    const secondTitleLine = $(Body.byQuery(".problem-properties"));
+    const secondTitleLine = $($().byQuery(".problem-properties"));
     const startButton = $$.BUTTON({
       content: "start ▶︎",
       css: `

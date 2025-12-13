@@ -34,11 +34,12 @@ export class Editor {
   constructor(private elements: EditorElements) {}
 
   async init(): Promise<void> {
-    // Setup CodeMirror
-    await new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.type = "module";
-      script.textContent = `
+    try {
+      // Setup CodeMirror
+      await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.type = "module";
+        script.textContent = `
           import { EditorView, basicSetup } from 'https://esm.sh/codemirror@6.0.1';
           import { python } from 'https://esm.sh/@codemirror/lang-python@6.1.3';
           import { javascript } from 'https://esm.sh/@codemirror/lang-javascript@6.2.1';
@@ -50,27 +51,33 @@ export class Editor {
           window.dispatchEvent(new Event('codemirror-loaded'));
         `;
 
-      window.addEventListener("codemirror-loaded", () => resolve(null), {
-        once: true,
+        window.addEventListener("codemirror-loaded", () => resolve(null), {
+          once: true,
+        });
+        script.onerror = reject;
+        document.head.appendChild(script);
       });
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
 
-    // Set up the language
-    const { languageSelector } = this.elements;
-    languageSelector.value = this.language;
-    languageSelector.addEventListener("change", (e) => {
-      const target = e.target as HTMLSelectElement;
-      this.language = target.value as Language;
-    });
-    // TODO: set up the runner
+      // Set up the language
+      const { languageSelector } = this.elements;
+      languageSelector.value = this.language;
+      languageSelector.addEventListener("change", (e) => {
+        const target = e.target as HTMLSelectElement;
+        this.language = target.value as Language;
+      });
+      // reset the editor with the new language
+      this.reset();
 
-    // Set up cntrl buttons
-    const { runBtn, clearBtn, submitBtn, output } = this.elements;
-    runBtn.addEventListener("click", this.run);
-    clearBtn.addEventListener("click", this.clear);
-    submitBtn.addEventListener("click", this.submit);
+      // Set up cntrl buttons
+      const { runBtn, clearBtn, submitBtn, output } = this.elements;
+      runBtn.addEventListener("click", this.run);
+      clearBtn.addEventListener("click", this.clear);
+      submitBtn.addEventListener("click", this.submit);
+    } catch (e) {
+      console.error(e);
+      this.status = "error";
+      return;
+    }
   }
 
   get content(): string {
@@ -98,17 +105,21 @@ export class Editor {
     DB.save(DB.KEYS.LANGUAGE_PREFERENCE, language);
 
     // Reset the editor
-    this.reset(language);
+    this.reset();
   }
 
-  async initRunner(dataset: string) {
-    const runner = this._runnerCache[this.language];
-    if (!runner.initialized) {
-      await runner.init(dataset);
+  private async initRunner() {
+    const dataset = this.dataset;
+    if (dataset == null) {
+      console.log("no dataset loaded yet, skipping runner initialization");
+      return;
+    }
+    if (!this.runner.initialized) {
+      await this.runner.init(dataset);
     }
   }
 
-  get runner() {
+  private get runner() {
     return this._runnerCache[this.language];
   }
 
@@ -154,88 +165,94 @@ export class Editor {
   async start(dataset: string) {
     this.dataset = dataset;
 
-    if (this.runner == null) {
-      await this.initRunner(dataset);
-    }
+    await this.initRunner();
 
     this.content = this.runner!.getSkeleton();
     this.addOutput("✓ Dataset loaded! Ready to analyze.", "success");
   }
 
   /** reset the editor after a language change */
-  async reset(language: Language) {
-    const win = window as WindowWithExtensions;
-    if (!win.CodeMirrorSetup) {
-      throw new Error("CodeMirror not loaded");
-    }
-
-    // Remove the old editor
-    this.view.destroy();
-
-    const {
-      EditorView,
-      basicSetup,
-      python,
-      javascript,
-      indentUnit,
-      keymap,
-      indentWithTab,
-    } = win.CodeMirrorSetup;
-
-    const defaultDocs: Record<Language, string> = {
-      python: "# Click 'Start in REPL' to start the challenge...\n",
-      javascript: "// Click 'Start in REPL' to start the challenge...\n",
-    };
-    const extension: Record<Language, () => void> = {
-      python,
-      javascript,
-    };
-
-    const runCodeKeymap = keymap.of([
-      indentWithTab,
-      {
-        key: "Ctrl-Enter",
-        mac: "Cmd-Enter",
-        run: this.run,
-      },
-    ]);
-
-    // Load saved code if available, otherwise use provided initialDoc or default
-    const savedCode = DB.get(`${DB.KEYS.CODE}${language}`);
-    const docToUse = savedCode || defaultDocs[this.language];
-
-    // Create update listener to save code on changes
-    const saveOnUpdate = EditorView.updateListener.of((update: any) => {
-      if (update.docChanged) {
-        const code = update.state.doc.toString();
-        DB.save(DB.KEYS.CODE, code);
+  private async reset() {
+    this.status = "loading";
+    try {
+      const win = window as WindowWithExtensions;
+      if (!win.CodeMirrorSetup) {
+        throw new Error("CodeMirror not loaded");
       }
-    });
 
-    // Initialize the new runner if needed
-    await this.initRunner(this.dataset);
+      // Remove the old editor if there is one
+      if (this.view) this.view.destroy();
 
-    // Reset the view
-    this.view = new EditorView({
-      doc: docToUse,
-      extensions: [
+      const {
+        EditorView,
         basicSetup,
-        extension[language](),
-        indentUnit.of("    "),
-        runCodeKeymap,
-        saveOnUpdate,
-        EditorView.theme({
-          "&": {
-            height: "100%",
-            backgroundColor: "#1e1e1e",
-          },
-          ".cm-scroller": {
-            overflow: "auto",
-          },
-        }),
-      ],
-      parent: this.elements.codeInput,
-    });
+        python,
+        javascript,
+        indentUnit,
+        keymap,
+        indentWithTab,
+      } = win.CodeMirrorSetup;
+
+      const defaultDocs: Record<Language, string> = {
+        python: "# Click 'start ▶︎' to start the challenge...\n",
+        javascript: "// Click 'start ▶︎' to start the challenge...\n",
+      };
+      const extension: Record<Language, () => void> = {
+        python,
+        javascript,
+      };
+
+      const runCodeKeymap = keymap.of([
+        indentWithTab,
+        {
+          key: "Ctrl-Enter",
+          mac: "Cmd-Enter",
+          run: this.run,
+        },
+      ]);
+
+      // Load saved code if available, otherwise use provided initialDoc or default
+      const savedCode = DB.get(`${DB.KEYS.CODE}${this.language}`);
+      const docToUse = savedCode || defaultDocs[this.language];
+
+      // Create update listener to save code on changes
+      const saveOnUpdate = EditorView.updateListener.of((update: any) => {
+        if (update.docChanged) {
+          const code = update.state.doc.toString();
+          DB.save(DB.KEYS.CODE, code);
+        }
+      });
+
+      // Initialize the new runner if needed
+      await this.initRunner();
+
+      // Reset the view
+      this.view = new EditorView({
+        doc: docToUse,
+        extensions: [
+          basicSetup,
+          extension[this.language](),
+          indentUnit.of("    "),
+          runCodeKeymap,
+          saveOnUpdate,
+          EditorView.theme({
+            "&": {
+              height: "100%",
+              backgroundColor: "#1e1e1e",
+            },
+            ".cm-scroller": {
+              overflow: "auto",
+            },
+          }),
+        ],
+        parent: this.elements.codeInput,
+      });
+    } catch (e) {
+      console.error(e);
+      this.status = "error";
+      return;
+    }
+    this.status = "ready";
   }
 
   /** Update the editors status */
