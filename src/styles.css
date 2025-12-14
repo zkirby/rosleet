@@ -440,6 +440,7 @@ small.hide-on-print,
 
 .rosalind-output-line {
   margin-bottom: 4px;
+  color: #1a1a1a;
 }
 
 .rosalind-output-error {
