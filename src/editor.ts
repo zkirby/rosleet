@@ -71,10 +71,10 @@ export class Editor {
       this.reset();
 
       // Set up cntrl buttons
-      const { runBtn, clearBtn, submitBtn, output } = this.elements;
-      runBtn.addEventListener("click", this.run);
-      clearBtn.addEventListener("click", this.clear);
-      submitBtn.addEventListener("click", this.submit);
+      const { runBtn, clearBtn, submitBtn } = this.elements;
+      runBtn.addEventListener("click", this.run.bind(this));
+      clearBtn.addEventListener("click", this.clear.bind(this));
+      submitBtn.addEventListener("click", this.submit.bind(this));
     } catch (e) {
       console.error(e);
       this.status = "error";
@@ -136,7 +136,7 @@ export class Editor {
       this.addOutput("Editor hasn't finished loading yet...", "error");
       return;
     }
-    const code = this.getLastOutput();
+    const code = this.content;
     if (code.trim() == "") {
       this.addOutput("Nothing to run...", "error");
       return;
@@ -145,7 +145,6 @@ export class Editor {
     const { runBtn } = this.elements;
     runBtn.disabled = true;
     runBtn.textContent = "Running...";
-    this.clear();
 
     try {
       for await (const { type, text } of runner.run(code)) {
@@ -175,6 +174,7 @@ export class Editor {
     const { runBtn, submitBtn } = this.elements;
     runBtn.disabled = false;
     submitBtn.disabled = false;
+    btn.textContent = "start ▶︎";
 
     // Start the timer
     this.startTimer(btn);
@@ -320,16 +320,17 @@ export class Editor {
 
   addOutput(text: string, type: OutputType | null = null) {
     const { output } = this.elements;
+    const classList = [
+      "rosalind-output-line",
+      type === "error"
+        ? "rosalind-output-error"
+        : type === "success"
+        ? "rosalind-output-success"
+        : "",
+    ].filter((cls) => cls !== ""); // Filter out empty strings
     const line = $$.DIV({
       content: text,
-      classList: [
-        "rosalind-output-line",
-        type === "error"
-          ? "rosalind-output-error"
-          : type === "success"
-          ? "rosalind-output-success"
-          : "",
-      ],
+      classList,
     });
     output.appendChild(line.el);
     output.scrollTop = output.scrollHeight;

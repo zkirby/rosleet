@@ -60,8 +60,8 @@ export class PythonRunner implements Runner {
       return `import pandas as pd
 import io
       
-# Dataset is pre-loaded in 'dataset' variable
-# Uncomment to view: print(dataset[:200])
+# Dataset is pre-loaded in 'dataset' variable. Uncomment to view: 
+# print(dataset[:200])
       
 # Load into pandas DataFrame
 df = pd.read_csv(io.StringIO(dataset), sep='${separator}')
@@ -72,8 +72,8 @@ print(df.head())
 # Your analysis code here`;
     }
 
-    return `# Dataset is pre-loaded in 'dataset' variable
-# Uncomment to view: print(dataset[:200])
+    return `# Dataset is pre-loaded in 'dataset' variable. Uncomment to view: 
+# print(dataset[:200])
       
 # Your analysis code here`;
   }
@@ -112,6 +112,13 @@ sys.stderr = io.StringIO()
       if (result !== undefined && result !== null) {
         yield {
           text: `Result: ${result}`,
+          type: null,
+        };
+      }
+
+      if (stdout) {
+        yield {
+          text: `Result: ${stdout}`,
           type: null,
         };
       }

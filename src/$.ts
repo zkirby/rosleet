@@ -40,6 +40,9 @@ export class QueryWrapper<TEl extends HTMLElement = HTMLElement> {
     const el = document.getElementById(id);
     return el as T;
   }
+  hide(query: string): void {
+    this.byQuery(query).remove();
+  }
 
   private static unwrap(node: Node | QueryWrapper) {
     return node instanceof QueryWrapper ? node.el : node;

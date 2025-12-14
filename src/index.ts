@@ -44,16 +44,6 @@ const EXCLUDED_PAGE_PREFIXES = [
     await editor.init();
 
     setupStartButton(editor);
-
-    // Reset MathJax formatting
-    if ((window as any).MathJax) {
-      console.log("MathJax found");
-      setTimeout(() => {
-        (window as any).MathJax.Hub.Rerender();
-      }, 1000);
-    } else {
-      console.log("MathJax not found");
-    }
   } catch (error) {
     console.error("Failed to initialize editor:", error);
     editor.addOutput(
@@ -267,16 +257,9 @@ function setupStartButton(editor: Editor): void {
     // Hide download link once found
     downloadLink.style.display = "none";
     const datasetUrl = downloadLink.href;
-    // prevent actual downloads, since we already have the link.
-    downloadLink.href = "";
-    document.addEventListener("click", (e) => {
-      const a = (e.target as HTMLElement).closest("a");
-      if (a == downloadLink) {
-        console.log("blocked usual download flow");
-        e.preventDefault();
-      }
-      console.log(a);
-    });
+
+    // Hide the time limit as well
+    $().hide(".problem-timelimit");
 
     const secondTitleLine = $($().byQuery(".problem-properties"));
     const startButton = $$.BUTTON({
@@ -315,7 +298,6 @@ function setupStartButton(editor: Editor): void {
       e.stopPropagation();
 
       try {
-        downloadLink.click();
         startButton.disabled = true;
         startButton.textContent = "Loading...";
         startButton.style.backgroundColor = "#6b7280";
