@@ -28,6 +28,10 @@ const EXCLUDED_PAGE_PREFIXES = [
   }
 
   injectStyles();
+  const loadingOverlay = createLoadingOverlay({
+    title: "Loading…",
+    subtitle: "Preparing the start button",
+  });
 
   // Create the split pane layout
   const elements = createSplitLayout();
@@ -43,7 +47,7 @@ const EXCLUDED_PAGE_PREFIXES = [
     // Setup editor
     await editor.init();
 
-    setupStartButton(editor);
+    setupStartButton(editor, { onMounted: () => loadingOverlay.hide() });
   } catch (error) {
     console.error("Failed to initialize editor:", error);
     editor.addOutput(
@@ -52,6 +56,8 @@ const EXCLUDED_PAGE_PREFIXES = [
       }`,
       "error"
     );
+  } finally {
+    loadingOverlay.hide();
   }
 
   console.log("Rosalind LeetCode Style with Python REPL loaded!");
@@ -61,6 +67,91 @@ function injectStyles(): void {
   const style = document.createElement("style");
   style.textContent = CSS_STYLES;
   document.head.appendChild(style);
+}
+
+function createLoadingOverlay(opts: { title?: string; subtitle?: string }): {
+  hide: () => void;
+} {
+  const overlay = $$.DIV({
+    id: "rosalind-loading-overlay",
+    css: `
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    `,
+  });
+
+  const card = $$.DIV({
+    css: `
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 18px 20px;
+      border-radius: 14px;
+      background: rgba(30, 41, 59, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+    `,
+  });
+
+  const spinner = $$.DIV({
+    css: `
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 3px solid rgba(148, 163, 184, 0.35);
+      border-top-color: rgba(255, 255, 255, 0.9);
+      animation: rosalindSpin 0.9s linear infinite;
+    `,
+  });
+
+  const title = $$.DIV({
+    content: opts.title ?? "Loading…",
+    css: `
+      font-size: 14px;
+      font-weight: 650;
+      letter-spacing: 0.2px;
+    `,
+  });
+
+  const subtitleText = opts.subtitle ?? "";
+  const subtitle = $$.DIV({
+    content: subtitleText,
+    css: `
+      font-size: 12px;
+      color: rgba(226, 232, 240, 0.85);
+    `,
+  });
+
+  card.append(spinner);
+  card.append(title);
+  if (subtitleText) card.append(subtitle);
+  overlay.append(card);
+
+  const style = document.createElement("style");
+  style.textContent = `
+@keyframes rosalindSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+#rosalind-loading-overlay.rosalind-fadeout { opacity: 0; transition: opacity 180ms ease; }
+  `.trim();
+  document.head.appendChild(style);
+  document.body.appendChild(overlay.el);
+
+  const hide = () => {
+    const el = $$.byId("rosalind-loading-overlay");
+    if (!el) return;
+    el.classList.add("rosalind-fadeout");
+    window.setTimeout(() => el.remove(), 200);
+  };
+
+  return { hide };
 }
 
 // ============================================================================
@@ -247,12 +338,30 @@ function setupResizer(
   window.addEventListener("resize", updateResizerPosition);
 }
 
-function setupStartButton(editor: Editor): void {
-  setTimeout(() => {
+function setupStartButton(
+  editor: Editor,
+  opts?: { onMounted?: () => void }
+): void {
+  const MAX_ATTEMPTS = 80; // ~8s @ 100ms
+  let attempts = 0;
+
+  const tick = () => {
+    attempts += 1;
+
     const downloadLink = $().byQuery<HTMLAnchorElement>(
       "a#id_problem_dataset_link"
     );
-    if (!downloadLink) return;
+    const propertiesEl = $().byQuery(".problem-properties");
+
+    if (!downloadLink || !propertiesEl) {
+      if (attempts >= MAX_ATTEMPTS) {
+        // Don't block the page forever if the link never appears.
+        opts?.onMounted?.();
+        return;
+      }
+      window.setTimeout(tick, 100);
+      return;
+    }
 
     // Hide download link once found
     downloadLink.style.display = "none";
@@ -261,7 +370,7 @@ function setupStartButton(editor: Editor): void {
     // Hide the time limit as well
     $().hide(".problem-timelimit");
 
-    const secondTitleLine = $($().byQuery(".problem-properties"));
+    const secondTitleLine = $(propertiesEl);
     const startButton = $$.BUTTON({
       content: "start ▶︎",
       css: `
@@ -280,6 +389,9 @@ function setupStartButton(editor: Editor): void {
       classList: ["rosalind-start-btn"],
     }).el;
     secondTitleLine.append(startButton);
+
+    // Mark "mounted" once the button is actually in the DOM.
+    opts?.onMounted?.();
 
     startButton.addEventListener("mouseenter", () => {
       startButton.style.backgroundColor = "#059669 !important";
@@ -320,5 +432,7 @@ function setupStartButton(editor: Editor): void {
         startButton.disabled = false;
       }
     });
-  }, 1000);
+  };
+
+  window.setTimeout(tick, 0);
 }
