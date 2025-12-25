@@ -33,6 +33,7 @@ export class Editor {
   };
   private timerInterval: number | null = null;
   private remainingSeconds: number = 300; // 5 minutes in seconds
+  private loadingOverlay: HTMLElement | null = null;
 
   constructor(private elements: EditorElements) {}
 
@@ -228,9 +229,102 @@ export class Editor {
     timerText.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
   }
 
+  /** Show loading overlay in the editor pane */
+  private showLoadingOverlay() {
+    if (this.loadingOverlay) return;
+
+    const overlay = $$.DIV({
+      id: "rosalind-editor-loading-overlay",
+      css: `
+        position: absolute;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(2px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #1a1a1a;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      `,
+    });
+
+    const card = $$.DIV({
+      css: `
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding: 18px 20px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.98);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      `,
+    });
+
+    const spinner = $$.DIV({
+      css: `
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        border: 3px solid rgba(0, 0, 0, 0.1);
+        border-top-color: #0e639c;
+        animation: rosalindEditorSpin 0.8s linear infinite;
+      `,
+    });
+
+    const title = $$.DIV({
+      content: "Loading language runtime...",
+      css: `
+        font-size: 13px;
+        font-weight: 500;
+        color: #1a1a1a;
+      `,
+    });
+
+    card.append(spinner);
+    card.append(title);
+    overlay.append(card);
+
+    // Add animation if not already present
+    if (!$$.byId("rosalind-editor-spinner-style")) {
+      const style = document.createElement("style");
+      style.id = "rosalind-editor-spinner-style";
+      style.textContent = `
+        @keyframes rosalindEditorSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const editorContainer = this.elements.codeInput.parentElement;
+    if (editorContainer) {
+      editorContainer.style.position = "relative";
+      editorContainer.appendChild(overlay.el);
+      this.loadingOverlay = overlay.el;
+    }
+  }
+
+  /** Hide loading overlay in the editor pane */
+  private hideLoadingOverlay() {
+    if (this.loadingOverlay) {
+      this.loadingOverlay.remove();
+      this.loadingOverlay = null;
+    }
+  }
+
   /** reset the editor after a language change */
   private async reset() {
     this.status = "loading";
+
+    const needsInit = this.started && !this.runner.initialized;
+    if (needsInit) {
+      this.showLoadingOverlay();
+    }
+
     try {
       const win = window as WindowWithExtensions;
       if (!win.CodeMirrorSetup) {
@@ -282,6 +376,7 @@ export class Editor {
 
       // Initialize the new runner if needed
       await this.initRunner();
+      this.hideLoadingOverlay();
 
       const docToUse =
         this.started && this.runner.initialized
@@ -312,6 +407,7 @@ export class Editor {
     } catch (e) {
       console.error(e);
       this.status = "error";
+      this.hideLoadingOverlay();
       return;
     }
     this.status = "ready";
@@ -390,6 +486,8 @@ export class Editor {
     }
 
     try {
+      DB.save(`${DB.KEYS.CODE}${this.language}`, this.content);
+
       const form = $$.byId<HTMLFormElement>("id_form_submission");
       const input = $$.byId<HTMLInputElement>("id_output_file");
 
