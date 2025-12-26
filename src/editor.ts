@@ -79,14 +79,15 @@ export class Editor {
       submitBtn.addEventListener("click", this.submit.bind(this));
 
       // Hotkeys
+      const keymap: Record<string, () => void> = {
+        k: bclear,
+        Enter: brun,
+      };
       document.addEventListener("keydown", (e) => {
-        if (e.metaKey) {
-          switch (e.key) {
-            case "k":
-              bclear();
-            case "Enter":
-              brun();
-          }
+        if (!e.metaKey) return;
+        const fn = keymap[e.key];
+        if (fn != null) {
+          fn();
           e.preventDefault();
         }
       });
