@@ -9,7 +9,6 @@ export class JavaScriptRunner implements Runner {
   public initialized: boolean = false;
 
   async init(dataset: string) {
-    if (this.initialized) return;
     (window as any).dataset = dataset;
     // JavaScript runs natively in the browser, no external dependencies needed
     this.initialized = true;
@@ -24,7 +23,7 @@ export class JavaScriptRunner implements Runner {
     if (hasCommas || hasTabs) {
       const separator = hasTabs ? "\\t" : ",";
       return `// Dataset is pre-loaded in 'dataset' variable
-// Uncomment to view: console.log(dataset.substring(0, 200))
+// console.log(dataset.substring(0, 200))
 
 // Parse CSV/TSV
 const lines = dataset.trim().split('\\n');
@@ -37,7 +36,7 @@ console.log('First few rows:', data.slice(0, 5));
     }
 
     return `// Dataset is pre-loaded in 'dataset' variable
-// Uncomment to view: console.log(dataset.substring(0, 200))
+// console.log(dataset.substring(0, 200))
 
 // Your analysis code here`;
   }

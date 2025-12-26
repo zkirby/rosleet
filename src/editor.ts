@@ -7,7 +7,6 @@ import {
   EditorElements,
   Language,
   OutputType,
-  PyodideInterface,
   StatusState,
   WindowWithExtensions,
 } from "./types";
@@ -25,14 +24,12 @@ export class Editor {
   private view: any; // EditorView from CodeMirror
   private dataset: string = "";
   private started: boolean = false;
-  // In a given session, if ths user switches languages multiple times
-  // avoid re-initing the runner;
   private _runnerCache: Record<Language, Runner> = {
     python: new PythonRunner(),
     javascript: new JavaScriptRunner(),
   };
   private timerInterval: number | null = null;
-  private remainingSeconds: number = 300; // 5 minutes in seconds
+  private remainingSeconds: number = 300;
   private loadingOverlay: HTMLElement | null = null;
 
   constructor(private elements: EditorElements) {}
@@ -101,12 +98,12 @@ export class Editor {
   }
 
   get language(): Language {
-    return DB.get(DB.KEYS.LANGUAGE_PREFERENCE, "python");
+    return DB.get(["LANGUAGE_PREFERENCE"]) ?? "python";
   }
 
   set language(language: Language) {
     // Update language
-    DB.save(DB.KEYS.LANGUAGE_PREFERENCE, language);
+    DB.save(["LANGUAGE_PREFERENCE"], language);
 
     // Reset the editor
     this.reset();
@@ -118,9 +115,8 @@ export class Editor {
       console.log("no dataset loaded yet, skipping runner initialization");
       return;
     }
-    if (!this.runner.initialized) {
-      await this.runner.init(dataset);
-    }
+
+    await this.runner.init(dataset);
   }
 
   private get runner() {
@@ -171,7 +167,6 @@ export class Editor {
 
     await this.reset();
 
-    this.content = this.runner!.getSkeleton();
     this.addOutput("✓ Dataset loaded! Ready to analyze.", "success");
 
     const { runBtn, submitBtn } = this.elements;
@@ -320,7 +315,7 @@ export class Editor {
   private async reset() {
     this.status = "loading";
 
-    const needsInit = this.started && !this.runner.initialized;
+    const needsInit = !this.runner.initialized;
     if (needsInit) {
       this.showLoadingOverlay();
     }
@@ -364,13 +359,13 @@ export class Editor {
 
       // If started, prefer (1) saved code for that language, otherwise (2) skeleton for that language.
       // If not started, show the default placeholder.
-      const savedCode = DB.get(`${DB.KEYS.CODE}${this.language}`);
+      const savedCode = DB.get(["CODE", this.language]);
 
       // Create update listener to save code on changes
       const saveOnUpdate = EditorView.updateListener.of((update: any) => {
         if (update.docChanged) {
           const code = update.state.doc.toString();
-          DB.save(`${DB.KEYS.CODE}${this.language}`, code);
+          DB.save(["CODE", this.language], code);
         }
       });
 
@@ -488,8 +483,6 @@ export class Editor {
     }
 
     try {
-      DB.save(`${DB.KEYS.CODE}${this.language}`, this.content);
-
       const form = $$.byId<HTMLFormElement>("id_form_submission");
       const input = $$.byId<HTMLInputElement>("id_output_file");
 

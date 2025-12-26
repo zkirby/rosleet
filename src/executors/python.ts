@@ -12,7 +12,10 @@ export class PythonRunner implements Runner {
   private pyodide: PyodideInterface | null = null;
 
   async init(dataset: string) {
-    if (this.initialized) return;
+    if (this.initialized) {
+      this.pyodide!.globals.set("dataset", dataset);
+      return;
+    }
 
     await new Promise((resolve, reject) => {
       const script = document.createElement("script");
@@ -60,7 +63,7 @@ export class PythonRunner implements Runner {
       return `import pandas as pd
 import io
       
-# Dataset is pre-loaded in 'dataset' variable. Uncomment to view: 
+# Dataset is pre-loaded in 'dataset' variable. 
 # print(dataset[:200])
       
 # Load into pandas DataFrame
@@ -72,7 +75,7 @@ print(df.head())
 # Your analysis code here`;
     }
 
-    return `# Dataset is pre-loaded in 'dataset' variable. Uncomment to view: 
+    return `# Dataset is pre-loaded in 'dataset' variable. 
 # print(dataset[:200])
       
 # Your analysis code here`;

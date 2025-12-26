@@ -1,3 +1,10 @@
+const TopLevelKeys = {
+  CODE: "CODE",
+  LANGUAGE_PREFERENCE: "LANGUAGE_PREFERENCE",
+} as const;
+
+type Key = [keyof typeof TopLevelKeys, ...string[]];
+
 /**
  * Simple local/session storage based db abstraction
  *
@@ -5,42 +12,41 @@
  */
 export class DB {
   private static readonly STORAGE_PREFIX = "rosalind_";
-  public static readonly KEYS = {
-    CODE: "CODE",
-    LANGUAGE_PREFERENCE: "LANGUAGE_PREFERENCE",
-  } as const;
 
-  private static key(key: keyof typeof DB.KEYS): string {
-    return DB.STORAGE_PREFIX + DB.problemId + "_" + key;
+  private static get rootKey(): string {
+    const problemId = window.location.pathname;
+    return DB.STORAGE_PREFIX + problemId;
   }
 
-  static get problemId(): string {
-    return window.location.pathname;
-  }
-
-  static save(key: `${keyof typeof DB.KEYS}${string}`, code: string): void;
-  static save(key: keyof typeof DB.KEYS, code: string): void {
+  private static get config(): Record<string, any> {
     try {
-      localStorage.setItem(DB.key(key), code);
+      const configString = localStorage.getItem(this.rootKey) ?? "{}";
+      return JSON.parse(configString);
+    } catch (e) {
+      console.warn(e);
+      return {};
+    }
+  }
+
+  static save<T>(key: Key, value: T): void {
+    try {
+      const config = this.config;
+
+      let current = config;
+      let [last] = key.splice(-1, 1);
+      for (let k of key) current = current[k] ??= {};
+      current[last] = value;
+
+      localStorage.setItem(this.rootKey, JSON.stringify(config));
     } catch (e) {
       console.error("Failed to save to localStorage:", e);
     }
   }
 
-  static get<T>(key: keyof typeof DB.KEYS, defaultValue: T): T;
-  static get<T>(
-    key: `${keyof typeof DB.KEYS}${string}`,
-    defaultValue?: T
-  ): T | null;
-  static get<T>(
-    key: keyof typeof DB.KEYS,
-    defaultValue: T | null = null
-  ): T | null {
-    try {
-      return (localStorage.getItem(DB.key(key)) as T) ?? defaultValue;
-    } catch (e) {
-      console.error("Failed to get from localStorage:", e);
-      return defaultValue;
-    }
+  static get<T>(key: Key): T | null | undefined {
+    let value = this.config;
+    const [last] = key.splice(-1, 1);
+    for (let k of key) value = value[k] ?? {};
+    return value[last];
   }
 }
