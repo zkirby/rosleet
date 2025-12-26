@@ -15,7 +15,11 @@ export class QueryWrapper<TEl extends HTMLElement = HTMLElement> {
     return this.el.innerHTML;
   }
 
-  append(node: Node | QueryWrapper) {
+  append(node: Node | QueryWrapper | null) {
+    if (node == null) {
+      console.warn("received null child, cannot append");
+      return;
+    }
     return this.el.appendChild(QueryWrapper.unwrap(node));
   }
 

@@ -15,6 +15,8 @@ export interface CodeMirrorSetup {
   indentUnit: any;
   keymap: any;
   indentWithTab: any;
+  EditorState: any;
+  Prec: any;
 }
 
 export type Language = "python" | "javascript";

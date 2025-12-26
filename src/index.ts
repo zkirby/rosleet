@@ -1,8 +1,10 @@
 import type { EditorElements } from "./types";
 import CSS_STYLES from "./styles.css";
 import { $, $$, QueryWrapper } from "./$";
-import DESC_SVG from "./desc-icon.svg";
-import SOLUTIONS_SVG from "./lab-icon.svg";
+import DESC_SVG from "./icons/desc-icon.svg";
+import SOLUTIONS_SVG from "./icons/lab-icon.svg";
+import QUESTION_SVG from "./icons/question-icon.svg";
+import EXPLAIN_SVG from "./icons/explain-icon.svg";
 import { DB } from "./db";
 import { Editor } from "./editor";
 
@@ -15,14 +17,18 @@ const EXCLUDED_PAGE_PREFIXES = [
   "tree-view",
   "locations",
 ];
+const EXCLUDED_PAGE_SUFFIXES = ["subs/recent/", "questions/", "explanation/"];
 
 (async function main() {
   "use strict";
 
-  const isExcludedPage = EXCLUDED_PAGE_PREFIXES.some((prefix) =>
+  const isExcludedPrefix = EXCLUDED_PAGE_PREFIXES.some((prefix) =>
     window.location.pathname.includes(`problems/${prefix}`)
   );
-  if (isExcludedPage) {
+  const isExcludedSuffix = EXCLUDED_PAGE_SUFFIXES.some((suffix) =>
+    window.location.pathname.endsWith(suffix)
+  );
+  if (isExcludedPrefix || isExcludedSuffix) {
     console.log("Rosalind LeetCode Style loaded (excluded page - no REPL)");
     return;
   }
@@ -272,6 +278,26 @@ function buildSplitPaneHeader(el: QueryWrapper) {
       gap: "3px",
     },
   });
+  const explain = $$.A({
+    href: `${DB.problemId}explanation/`,
+    content: `${EXPLAIN_SVG} <div>Explanation</div>`,
+    style: {
+      width: "90px",
+      display: "flex",
+      height: "fit-content",
+      gap: "3px",
+    },
+  });
+  const questions = $$.A({
+    href: `${DB.problemId}questions/`,
+    content: `${QUESTION_SVG} <div>Questions</div>`,
+    style: {
+      width: "82px",
+      display: "flex",
+      height: "fit-content",
+      gap: "3px",
+    },
+  });
 
   const next = $().byQuery("li.next > a");
   const prev = $().byQuery("li.previous > a");
@@ -285,6 +311,13 @@ function buildSplitPaneHeader(el: QueryWrapper) {
 
   left.append(desc);
   left.append(solutions);
+
+  const extra = $().byQuery(".problem-comments");
+  if (extra.childElementCount > 0) {
+    left.append(explain);
+    left.append(questions);
+    extra.remove();
+  }
 
   right.append(prev);
   right.append(next);
@@ -413,13 +446,12 @@ function setupStartButton(
         startButton.disabled = true;
         startButton.textContent = "Loading...";
         startButton.style.backgroundColor = "#6b7280";
+        startButton.style.opacity = "0.7";
 
         const response = await fetch(datasetUrl);
         const datasetText = await response.text();
 
         editor.start(datasetText, startButton);
-
-        startButton.style.opacity = "0.7";
       } catch (error) {
         editor.addOutput(
           `Error loading dataset: ${

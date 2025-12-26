@@ -47,8 +47,9 @@ export class Editor {
           import { indentUnit } from 'https://esm.sh/@codemirror/language@6.9.0';
           import { keymap } from 'https://esm.sh/@codemirror/view@6.21.0';
           import { indentWithTab } from 'https://esm.sh/@codemirror/commands@6.3.0';
+          import { EditorState, Prec } from 'https://esm.sh/@codemirror/state@6.5.3';
     
-          window.CodeMirrorSetup = { EditorView, basicSetup, python, javascript,  indentUnit, keymap, indentWithTab };
+          window.CodeMirrorSetup = { EditorView, EditorState, Prec, basicSetup, python, javascript,  indentUnit, keymap, indentWithTab  };
           window.dispatchEvent(new Event('codemirror-loaded'));
         `;
 
@@ -71,9 +72,24 @@ export class Editor {
 
       // Set up cntrl buttons
       const { runBtn, clearBtn, submitBtn } = this.elements;
-      runBtn.addEventListener("click", this.run.bind(this));
-      clearBtn.addEventListener("click", this.clear.bind(this));
+      const brun = this.run.bind(this);
+      const bclear = this.clear.bind(this);
+      runBtn.addEventListener("click", brun);
+      clearBtn.addEventListener("click", bclear);
       submitBtn.addEventListener("click", this.submit.bind(this));
+
+      // Hotkeys
+      document.addEventListener("keydown", (e) => {
+        if (e.metaKey) {
+          switch (e.key) {
+            case "k":
+              bclear();
+            case "Enter":
+              brun();
+          }
+          e.preventDefault();
+        }
+      });
     } catch (e) {
       console.error(e);
       this.status = "error";
@@ -180,10 +196,8 @@ export class Editor {
 
   /** Start the 5-minute countdown timer */
   private startTimer(btn: HTMLButtonElement) {
-    // Clear any existing timer
     this.stopTimer();
 
-    // Check if there's an active timestamp saved to the DB
     const startTimestamp = DB.get<number>(["START_TIMESTAMP"]);
     const fiveMinutesInMs = 5 * 60 * 1000;
     const now = Date.now();
@@ -202,10 +216,8 @@ export class Editor {
     const { timer } = this.elements;
     timer.style.display = "flex";
 
-    // Update the display immediately
     this.updateTimerDisplay();
 
-    // Start the countdown
     this.timerInterval = window.setInterval(() => {
       this.remainingSeconds--;
       this.updateTimerDisplay();
@@ -215,6 +227,8 @@ export class Editor {
         this.addOutput("⏰ Time's up! Try again.", "error");
         btn.disabled = false;
         btn.style.opacity = "1";
+        btn.style.backgroundColor = "#10b981";
+
         // Clear the timestamp when time expires
         DB.save(["START_TIMESTAMP"], null);
       }
@@ -351,7 +365,7 @@ export class Editor {
         javascript,
         indentUnit,
         keymap,
-        indentWithTab,
+        Prec,
       } = win.CodeMirrorSetup;
 
       const defaultDocs: Record<Language, string> = {
@@ -363,14 +377,7 @@ export class Editor {
         javascript,
       };
 
-      const runCodeKeymap = keymap.of([
-        indentWithTab,
-        {
-          key: "Ctrl-Enter",
-          mac: "Cmd-Enter",
-          run: this.run,
-        },
-      ]);
+      const runCodeKeymap = Prec.high();
 
       // If started, prefer (1) saved code for that language, otherwise (2) skeleton for that language.
       // If not started, show the default placeholder.
@@ -397,10 +404,9 @@ export class Editor {
       this.view = new EditorView({
         doc: docToUse,
         extensions: [
-          basicSetup,
           extension[this.language](),
           indentUnit.of("    "),
-          runCodeKeymap,
+          basicSetup,
           saveOnUpdate,
           // Make editor editable only if started
           EditorView.editable.of(this.started),

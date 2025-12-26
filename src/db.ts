@@ -15,9 +15,12 @@ type Key = [keyof typeof TopLevelKeys, ...string[]];
 export class DB {
   private static readonly STORAGE_PREFIX = "rosalind_";
 
+  public static get problemId(): string {
+    return window.location.pathname;
+  }
+
   private static get rootKey(): string {
-    const problemId = window.location.pathname;
-    return DB.STORAGE_PREFIX + problemId;
+    return DB.STORAGE_PREFIX + DB.problemId;
   }
 
   private static get config(): Record<string, any> {
