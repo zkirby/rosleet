@@ -31,6 +31,8 @@ export class Editor {
   private timerInterval: number | null = null;
   private remainingSeconds: number = 300;
   private loadingOverlay: HTMLElement | null = null;
+  private submitCooldownInterval: number | null = null;
+  private readonly SUBMIT_COOLDOWN_MS = 50 * 1000; // 50 seconds
 
   constructor(private elements: EditorElements) {}
 
@@ -77,6 +79,10 @@ export class Editor {
       runBtn.addEventListener("click", brun);
       clearBtn.addEventListener("click", bclear);
       submitBtn.addEventListener("click", this.submit.bind(this));
+
+      // Initialize submit cooldown check
+      this.updateSubmitButtonState();
+      this.startSubmitCooldownCheck();
 
       // Hotkeys
       const keymap: Record<string, () => void> = {
@@ -186,9 +192,9 @@ export class Editor {
 
     this.addOutput("✓ Dataset loaded! Ready to analyze.", "success");
 
-    const { runBtn, submitBtn } = this.elements;
+    const { runBtn } = this.elements;
     runBtn.disabled = false;
-    submitBtn.disabled = false;
+    this.updateSubmitButtonState(); // Respect cooldown when starting
     btn.textContent = "start ▶︎";
 
     // Start the timer
@@ -497,7 +503,77 @@ export class Editor {
     return outputLines.join("\n").trim();
   }
 
+  /** Check if submission is allowed based on cooldown */
+  private canSubmit(): boolean {
+    const lastSubmitTimestamp = DB.get<number>(["LAST_SUBMIT_TIMESTAMP"]);
+    if (!lastSubmitTimestamp) {
+      return true;
+    }
+
+    const now = Date.now();
+    const timeSinceLastSubmit = now - lastSubmitTimestamp;
+    return timeSinceLastSubmit >= this.SUBMIT_COOLDOWN_MS;
+  }
+
+  /** Get remaining cooldown time in seconds */
+  private getRemainingCooldownSeconds(): number {
+    const lastSubmitTimestamp = DB.get<number>(["LAST_SUBMIT_TIMESTAMP"]);
+    if (!lastSubmitTimestamp) {
+      return 0;
+    }
+
+    const now = Date.now();
+    const timeSinceLastSubmit = now - lastSubmitTimestamp;
+    const remaining = this.SUBMIT_COOLDOWN_MS - timeSinceLastSubmit;
+    return Math.max(0, Math.floor(remaining / 1000));
+  }
+
+  /** Update the submit button state based on cooldown */
+  private updateSubmitButtonState(): void {
+    const { submitBtn } = this.elements;
+    const canSubmit = this.canSubmit();
+    const remainingSeconds = this.getRemainingCooldownSeconds();
+
+    if (canSubmit) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit Output";
+    } else {
+      submitBtn.disabled = true;
+      submitBtn.textContent = `Submit Output (${remainingSeconds}s)`;
+    }
+  }
+
+  /** Start periodic check for submit cooldown */
+  private startSubmitCooldownCheck(): void {
+    this.stopSubmitCooldownCheck();
+    this.updateSubmitButtonState();
+
+    this.submitCooldownInterval = window.setInterval(() => {
+      this.updateSubmitButtonState();
+    }, 1000);
+  }
+
+  /** Stop the submit cooldown check interval */
+  private stopSubmitCooldownCheck(): void {
+    if (this.submitCooldownInterval !== null) {
+      clearInterval(this.submitCooldownInterval);
+      this.submitCooldownInterval = null;
+    }
+  }
+
   submit() {
+    // Check cooldown before allowing submission
+    if (!this.canSubmit()) {
+      const remaining = this.getRemainingCooldownSeconds();
+      this.addOutput(
+        `Please wait ${remaining} second${
+          remaining !== 1 ? "s" : ""
+        } before submitting again.`,
+        "error"
+      );
+      return;
+    }
+
     const output = this.getLastOutput();
     if (!output) {
       this.addOutput("No output to submit. Run your code first.", "error");
@@ -511,6 +587,13 @@ export class Editor {
       if (!form || !input) {
         throw new Error("Submission form or file input not found");
       }
+
+      // Save the submission timestamp
+      DB.save(["LAST_SUBMIT_TIMESTAMP"], Date.now());
+      this.updateSubmitButtonState();
+
+      // Stop the top-level timer after submission
+      this.stopTimer();
 
       // Create a File object from the output string
       const blob = new Blob([output], { type: "text/plain" });

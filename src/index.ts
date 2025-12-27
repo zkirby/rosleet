@@ -313,7 +313,7 @@ function buildSplitPaneHeader(el: QueryWrapper) {
   left.append(solutions);
 
   const extra = $().byQuery(".problem-comments");
-  if (extra.childElementCount > 0) {
+  if (extra?.childElementCount > 0) {
     left.append(explain);
     left.append(questions);
     extra.remove();
