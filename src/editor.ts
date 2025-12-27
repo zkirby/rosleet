@@ -174,6 +174,16 @@ export class Editor {
       this.addOutput("Editor hasn't finished loading yet...", "error");
       return;
     }
+    if (!this.canSubmit()) {
+      const remaining = this.getRemainingCooldownSeconds();
+      this.addOutput(
+        `Please wait ${remaining} second${
+          remaining !== 1 ? "s" : ""
+        } before running again.`,
+        "error"
+      );
+      return;
+    }
     const code = this.content;
     if (code.trim() == "") {
       this.addOutput("Nothing to run...", "error");
@@ -401,8 +411,6 @@ export class Editor {
         javascript,
       };
 
-      const runCodeKeymap = Prec.high();
-
       // If started, prefer (1) saved code for that language, otherwise (2) skeleton for that language.
       // If not started, show the default placeholder.
       const savedCode = DB.get<string>(["CODE", this.language]);
@@ -625,8 +633,9 @@ export class Editor {
         throw new Error("Submission form or file input not found");
       }
 
-      // Save the submission timestamp
+      // Reset timestamps
       DB.save(["LAST_SUBMIT_TIMESTAMP"], Date.now());
+      DB.save(["START_TIMESTAMP"], null);
       this.updateSubmitButtonState();
 
       // Stop the top-level timer after submission
