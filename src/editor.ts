@@ -23,16 +23,17 @@ const TextToState: Record<StatusState, string> = {
 export class Editor {
   private view: any; // EditorView from CodeMirror
   private dataset: string = "";
+  private datasetUrl: string = "";
   private started: boolean = false;
   private _runnerCache: Record<Language, Runner> = {
     python: new PythonRunner(),
     javascript: new JavaScriptRunner(),
   };
+  private btn: any = null;
   private timerInterval: number | null = null;
   private remainingSeconds: number = 300;
   private loadingOverlay: HTMLElement | null = null;
   private submitCooldownInterval: number | null = null;
-  private readonly SUBMIT_COOLDOWN_MS = 50 * 1000; // 50 seconds
   private isSuccessful: boolean = false;
 
   constructor(private elements: EditorElements) {}
@@ -85,8 +86,7 @@ export class Editor {
       submitBtn.addEventListener("click", this.submit.bind(this));
 
       // Initialize submit cooldown check (only if not already successful)
-      if (!this.isSuccessful) {
-        this.updateSubmitButtonState();
+      if (!this.canSubmit()) {
         this.startSubmitCooldownCheck();
       }
 
@@ -175,13 +175,7 @@ export class Editor {
       return;
     }
     if (!this.canSubmit()) {
-      const remaining = this.getRemainingCooldownSeconds();
-      this.addOutput(
-        `Please wait ${remaining} second${
-          remaining !== 1 ? "s" : ""
-        } before running again.`,
-        "error"
-      );
+      this.addOutput("Please wait before running again.", "error");
       return;
     }
     const code = this.content;
@@ -211,21 +205,25 @@ export class Editor {
   }
 
   /** Start the problem in the editor */
-  async start(dataset: string, btn: HTMLButtonElement) {
+  async start(dataset: string, datasetUrl: string, btn: HTMLButtonElement) {
     this.dataset = dataset;
     this.started = true;
+    this.datasetUrl = datasetUrl;
+    this.btn = btn;
 
     await this.reset();
 
     this.addOutput("✓ Dataset loaded! Ready to analyze.", null);
 
-    const { runBtn } = this.elements;
+    const { runBtn, submitBtn } = this.elements;
     runBtn.disabled = false;
-    this.updateSubmitButtonState(); // Respect cooldown when starting
+    submitBtn.disabled = false;
     btn.textContent = "start ▶︎";
 
     // Start the timer
-    this.startTimer(btn);
+    if (this.canSubmit()) {
+      this.startTimer(btn);
+    }
   }
 
   /** Start the 5-minute countdown timer */
@@ -392,15 +390,8 @@ export class Editor {
       // Remove the old editor if there is one
       if (this.view) this.view.destroy();
 
-      const {
-        EditorView,
-        basicSetup,
-        python,
-        javascript,
-        indentUnit,
-        keymap,
-        Prec,
-      } = win.CodeMirrorSetup;
+      const { EditorView, basicSetup, python, javascript, indentUnit } =
+        win.CodeMirrorSetup;
 
       const defaultDocs: Record<Language, string> = {
         python: "# Click 'start ▶︎' to start the challenge...\n",
@@ -542,34 +533,18 @@ export class Editor {
     return outputLines.join("\n").trim();
   }
 
-  /** Check if submission is allowed based on cooldown */
-  private canSubmit(): boolean {
-    const lastSubmitTimestamp = DB.get<number>(["LAST_SUBMIT_TIMESTAMP"]);
-    if (!lastSubmitTimestamp) {
-      return true;
+  /** Check if submission is allowed by looking for the "Please wait" element */
+  public canSubmit(): boolean {
+    const pleaseWaitElement = $().byQuery(".problem-timewait");
+    if (pleaseWaitElement && pleaseWaitElement.style.display !== "none") {
+      return false;
     }
-
-    const now = Date.now();
-    const timeSinceLastSubmit = now - lastSubmitTimestamp;
-    return timeSinceLastSubmit >= this.SUBMIT_COOLDOWN_MS;
+    return true;
   }
 
-  /** Get remaining cooldown time in seconds */
-  private getRemainingCooldownSeconds(): number {
-    const lastSubmitTimestamp = DB.get<number>(["LAST_SUBMIT_TIMESTAMP"]);
-    if (!lastSubmitTimestamp) {
-      return 0;
-    }
-
-    const now = Date.now();
-    const timeSinceLastSubmit = now - lastSubmitTimestamp;
-    const remaining = this.SUBMIT_COOLDOWN_MS - timeSinceLastSubmit;
-    return Math.max(0, Math.floor(remaining / 1000));
-  }
-
-  /** Update the submit button state based on cooldown */
-  private updateSubmitButtonState(): void {
-    const { submitBtn } = this.elements;
+  /** Update the submit button state based on presence of "Please wait" element */
+  private async updateSubmitButtonState(): Promise<void> {
+    const { submitBtn, runBtn } = this.elements;
 
     // If problem is already successful, button should be disabled (handled in handleSuccess)
     if (this.isSuccessful) {
@@ -577,14 +552,21 @@ export class Editor {
     }
 
     const canSubmit = this.canSubmit();
-    const remainingSeconds = this.getRemainingCooldownSeconds();
 
     if (canSubmit) {
       submitBtn.disabled = false;
       submitBtn.textContent = "Submit Output";
+
+      const response = await fetch(this.datasetUrl);
+      this.dataset = await response.text();
+      this.start(this.dataset, this.datasetUrl, this.btn);
+
+      this.stopSubmitCooldownCheck();
     } else {
       submitBtn.disabled = true;
-      submitBtn.textContent = `Submit Output (${remainingSeconds}s)`;
+      submitBtn.textContent = "Submit (Wait 50s)";
+      runBtn.disabled = true;
+      this.addOutput("Please wait 50s before submitting again.");
     }
   }
 
@@ -609,13 +591,7 @@ export class Editor {
   submit() {
     // Check cooldown before allowing submission
     if (!this.canSubmit()) {
-      const remaining = this.getRemainingCooldownSeconds();
-      this.addOutput(
-        `Please wait ${remaining} second${
-          remaining !== 1 ? "s" : ""
-        } before submitting again.`,
-        "error"
-      );
+      this.addOutput("Please wait before submitting again.", "error");
       return;
     }
 
@@ -633,10 +609,8 @@ export class Editor {
         throw new Error("Submission form or file input not found");
       }
 
-      // Reset timestamps
-      DB.save(["LAST_SUBMIT_TIMESTAMP"], Date.now());
+      // Reset start timestamp
       DB.save(["START_TIMESTAMP"], null);
-      this.updateSubmitButtonState();
 
       // Stop the top-level timer after submission
       this.stopTimer();
@@ -682,9 +656,6 @@ export class Editor {
     // Clear all timers
     this.stopTimer();
     this.stopSubmitCooldownCheck();
-
-    // Clear submit cooldown timestamp since problem is solved
-    DB.save(["LAST_SUBMIT_TIMESTAMP"], null);
 
     // Disable all buttons
     const { runBtn, submitBtn, clearBtn, languageSelector } = this.elements;

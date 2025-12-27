@@ -403,8 +403,6 @@ function setupStartButton(
     downloadLink.style.display = "none";
     const datasetUrl = downloadLink.href;
 
-    DB.save(["DATASET_URL"], datasetUrl);
-
     $().hide(".problem-timelimit");
 
     const secondTitleLine = $(propertiesEl);
@@ -458,10 +456,14 @@ function setupStartButton(
         startButton.style.backgroundColor = "#6b7280";
         startButton.style.opacity = "0.7";
 
-        const response = await fetch(datasetUrl);
-        const datasetText = await response.text();
+        let dataset = "";
 
-        editor.start(datasetText, startButton);
+        if (editor.canSubmit()) {
+          const response = await fetch(datasetUrl);
+          dataset = await response.text();
+        }
+
+        editor.start(dataset, datasetUrl, startButton);
       } catch (error) {
         editor.addOutput(
           `Error loading dataset: ${
@@ -488,7 +490,7 @@ function setupStartButton(
       const fiveMinutesInMs = 5 * 60 * 1000;
       const now = Date.now();
       if (startTimestamp) {
-        if (now - startTimestamp < fiveMinutesInMs) {
+        if (now - startTimestamp < fiveMinutesInMs || !editor.canSubmit()) {
           onStart();
         } else {
           DB.save(["START_TIMESTAMP"], null);
