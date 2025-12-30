@@ -97,20 +97,6 @@ export class Editor {
         }
       });
 
-      // Initialize the editor
-      if (this.problem.isSolved) {
-        this.solved();
-        return;
-      } else if (this.problem.isWaiting) {
-        this.wait();
-        return;
-      } else if (this.problem.isStarted) {
-        // Auto-start if already started
-        this.start();
-        return;
-      }
-
-      // Default state
       this.setEditor(null, false);
     } catch (e) {
       console.error(e);
@@ -442,7 +428,7 @@ export class Editor {
     }
   }
 
-  private solved() {
+  solved() {
     this.elements.languageSelector.disabled = true;
     this.elements.startBtn.disable();
 
@@ -455,7 +441,7 @@ export class Editor {
     );
   }
 
-  private wait() {
+  wait() {
     const { languageSelector, submitBtn, startBtn, runBtn } = this.elements;
     languageSelector.disabled = true;
     startBtn.disable();

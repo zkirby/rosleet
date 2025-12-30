@@ -59,6 +59,16 @@ const EXCLUDED_PAGE_SUFFIXES = ["subs/recent/", "questions/", "explanation/"];
 
     mj.switchToSvg();
 
+    // Initialize editor to correct problem state.
+    if (problem.isSolved) {
+      editor.solved();
+    } else if (problem.isWaiting) {
+      editor.wait();
+    } else if (problem.isStarted) {
+      // Auto-start if already started
+      editor.start();
+    }
+
     console.log("Rosalind LeetCode Style with Python REPL loaded!");
   } catch (error) {
     console.error("Failed to initialize editor:", error);
